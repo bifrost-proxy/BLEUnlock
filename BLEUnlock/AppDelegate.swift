@@ -528,6 +528,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         let hasMonitored = orderedUUIDs.contains(where: { monitoredSet.contains($0) })
         let hasUnmonitored = orderedUUIDs.contains(where: { !monitoredSet.contains($0) })
         groupSeparatorItem?.isHidden = !(hasMonitored && hasUnmonitored)
+        scanningMenuItem?.isHidden = !(hasMonitored && hasUnmonitored)
     }
 
     /// Reverse lookup: find the UUID for a menu item currently in the device menu.
