@@ -42,16 +42,42 @@ func appendNameResolutionLog(_ message: String) {
     handle.closeFile()
 }
 
+// MARK: - Cached system lookups (avoid redundant disk I/O)
+
+var _cachedBTPlists: (timestamp: TimeInterval, plist: NSDictionary?, ledevices: [String: NSDictionary])?
+let _btPlistCacheTTL: TimeInterval = 30
+
+private func cachedBTResources() -> (plist: NSDictionary?, ledevices: [String: NSDictionary]) {
+    let now = Date().timeIntervalSince1970
+    if let cache = _cachedBTPlists, now - cache.timestamp < _btPlistCacheTTL {
+        return (cache.plist, cache.ledevices)
+    }
+    let plist = NSDictionary(contentsOfFile: "/Library/Preferences/com.apple.Bluetooth.plist")
+    var ledevices: [String: NSDictionary] = [:]
+    if let coreCache = plist?["CoreBluetoothCache"] as? NSDictionary {
+        for (key, value) in coreCache {
+            if let k = key as? String, let v = value as? NSDictionary {
+                ledevices[k] = v
+            }
+        }
+    }
+    _cachedBTPlists = (now, plist, ledevices)
+    return (plist, ledevices)
+}
+
+private func flushBTPlistsCache() {
+    _cachedBTPlists = nil
+}
+
 func getMACFromUUID(_ uuid: String) -> String? {
-    guard let plist = NSDictionary(contentsOfFile: "/Library/Preferences/com.apple.Bluetooth.plist") else { return nil }
-    guard let cbcache = plist["CoreBluetoothCache"] as? NSDictionary else { return nil }
-    guard let device = cbcache[uuid] as? NSDictionary else { return nil }
+    let (_, ledevices) = cachedBTResources()
+    guard let device = ledevices[uuid] else { return nil }
     return device["DeviceAddress"] as? String
 }
 
 func getNameFromMAC(_ mac: String) -> String? {
-    guard let plist = NSDictionary(contentsOfFile: "/Library/Preferences/com.apple.Bluetooth.plist") else { return nil }
-    guard let devcache = plist["DeviceCache"] as? NSDictionary else { return nil }
+    let (plist, _) = cachedBTResources()
+    guard let devcache = plist?["DeviceCache"] as? NSDictionary else { return nil }
     guard let device = devcache[mac] as? NSDictionary else { return nil }
     if let name = device["Name"] as? String {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
@@ -91,6 +117,8 @@ class Device: NSObject {
     var blName: String?
     var advertisedLocalName: String?
     var lastNameDebugSnapshot: String?
+    /// Timestamp of last MAC resolution attempt; used to throttle redundant lookups.
+    var lastMACLookupTime: TimeInterval = 0
 
     func normalizedName(_ candidate: String?) -> String? {
         guard let candidate = candidate?.trimmingCharacters(in: .whitespaces), !candidate.isEmpty else { return nil }
@@ -172,15 +200,17 @@ class Device: NSObject {
             return mod
         }
 
-        if macAddr == nil || blName == nil {
+        // Throttle IOBluetooth lookups: only retry after cooldown
+        let now = Date().timeIntervalSince1970
+        if (macAddr == nil || blName == nil), now - lastMACLookupTime >= 5.0 {
+            lastMACLookupTime = now
             if let info = getLEDeviceInfoFromUUID(uuid.description) {
                 updateNameIfNeeded(info.name)
                 macAddr = macAddr ?? info.macAddr
             }
-        }
-
-        if macAddr == nil {
-            macAddr = getMACFromUUID(uuid.description)
+            if macAddr == nil {
+                macAddr = getMACFromUUID(uuid.description)
+            }
         }
 
         if let mac = macAddr, blName == nil {

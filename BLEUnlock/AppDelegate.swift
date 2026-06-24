@@ -435,7 +435,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
             guard let item = deviceDict[uuid] else { return nil }
             return (uuid, item)
         }
-        let monitoredFirst = snapshot.filter { monitoredSet.contains($0.0) }
+        // Monitored sorted by stable key (MAC > UUID) to prevent reordering as names resolve
+        let monitoredFirst = snapshot
+            .filter { monitoredSet.contains($0.0) }
+            .sorted {
+                let keyA = ble.devices[$0.0]?.macAddr ?? $0.0.uuidString
+                let keyB = ble.devices[$1.0]?.macAddr ?? $1.0.uuidString
+                return keyA.localizedStandardCompare(keyB) == .orderedAscending
+            }
         let unmonitoredAfter = snapshot.filter { !monitoredSet.contains($0.0) }
         let wantsSeparator = !monitoredFirst.isEmpty && !unmonitoredAfter.isEmpty
 
@@ -459,7 +466,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
             if let item = deviceMenu.item(at: i) { current.append(item) }
         }
 
-        // Diff & reconcile: walk both lists, removing stale items and inserting missing ones
+        // Diff & reconcile: walk both lists, removing stale items, inserting new ones,
+        // and keeping existing items in place to avoid unnecessary visual reordering.
         var ci = 0, di = 0
         while ci < current.count || di < desired.count {
             if di >= desired.count {
@@ -479,8 +487,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
                 ci += 1; di += 1
                 continue
             }
-            // Mismatch: check if the desired item already exists later in current
+            // Mismatch: check if the desired item exists later in current
             if let later = current[ci...].firstIndex(where: { $0 === desired[di] }) {
+                // Stale items between ci and later — remove them
                 for _ in ci..<later {
                     deviceMenu.removeItem(at: devStart + ci)
                     current.remove(at: ci)
@@ -488,7 +497,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
                 ci += 1; di += 1
                 continue
             }
-            // Current item is stale
+            // Check if current[ci] exists later in desired (still needed, just out of order)
+            if desired[di...].contains(where: { $0 === current[ci] }) {
+                // Current item is needed but later — desired[di] is new, insert it
+                deviceMenu.insertItem(desired[di], at: devStart + ci)
+                current.insert(desired[di], at: ci)
+                ci += 1; di += 1
+                continue
+            }
+            // Current item is stale (not in desired list)
             deviceMenu.removeItem(at: devStart + ci)
             current.remove(at: ci)
         }
@@ -655,6 +672,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
             updateMonitorStatusItems()
             return
         }
+        // MAC correlation: if unmonitored device shares MAC with a monitored one, merge.
+        // Try resolving MAC first (cached Bluetooth plist lookup, near-zero cost).
+        if !ble.isMonitoring(uuid: device.uuid) {
+            var mac = device.macAddr
+            if mac == nil {
+                mac = getMACFromUUID(device.uuid.uuidString)
+                if mac != nil { device.macAddr = mac }
+            }
+            if let mac = mac {
+                for (monUUID, monDev) in ble.devices where ble.isMonitoring(uuid: monUUID) {
+                    if monDev.macAddr?.caseInsensitiveCompare(mac) == .orderedSame {
+                        mergeDevice(oldUUID: monUUID, newDevice: device)
+                        return
+                    }
+                }
+            }
+        }
         let menuItem = addDeviceMenuItem(title: "", uuid: device.uuid)
         let checkbox = configureDeviceMenuView(menuItem, uuid: device.uuid, title: menuItemTitle(device: device))
         deviceDict[device.uuid] = menuItem
@@ -712,13 +746,41 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     }
 
     func mergeDevice(oldUUID: UUID, newDevice: Device) {
+        // Clean up insertion order: remove any prior entry for newUUID (from newDevice)
+        // before replacing oldUUID's position, preventing duplicates.
+        deviceInsertionOrder.removeAll { $0 == newDevice.uuid }
+        replaceUUIDInInsertionOrder(old: oldUUID, new: newDevice.uuid)
+        
+        if deviceMenuIsOpen, let oldItem = deviceDict[oldUUID] {
+            // During tracking: repurpose the existing menu item in-place.
+            // Remove any stale menu item that newDevice already created for newUUID first,
+            // then remap the old item to the new UUID without touching menu structure.
+            if let staleItem = deviceDict.removeValue(forKey: newDevice.uuid) {
+                staleItem.menu?.removeItem(staleItem)
+                deviceCheckboxDict.removeValue(forKey: newDevice.uuid)
+            }
+            deviceDict.removeValue(forKey: oldUUID)
+            deviceDict[newDevice.uuid] = oldItem
+            if let checkbox = deviceCheckboxDict.removeValue(forKey: oldUUID) {
+                updateDeviceCheckbox(checkbox, uuid: newDevice.uuid, title: menuItemTitle(device: newDevice))
+                deviceCheckboxDict[newDevice.uuid] = checkbox
+            }
+            updateMonitorStatusItems()
+            persistDeviceMACs()
+            return
+        }
+        
+        // Not tracking: safe full rebuild
         // Remove old menu entry
         if let menuItem = deviceDict.removeValue(forKey: oldUUID) {
             menuItem.menu?.removeItem(menuItem)
         }
         deviceCheckboxDict.removeValue(forKey: oldUUID)
-        // Preserve insertion order position
-        replaceUUIDInInsertionOrder(old: oldUUID, new: newDevice.uuid)
+        // Remove any existing entry for new UUID (may exist from newDevice before MAC resolved)
+        if let existingItem = deviceDict.removeValue(forKey: newDevice.uuid) {
+            existingItem.menu?.removeItem(existingItem)
+        }
+        deviceCheckboxDict.removeValue(forKey: newDevice.uuid)
         // Add new menu entry
         let menuItem = addDeviceMenuItem(title: "", uuid: newDevice.uuid)
         let checkbox = configureDeviceMenuView(menuItem, uuid: newDevice.uuid, title: menuItemTitle(device: newDevice))
