@@ -321,13 +321,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     func resolveMonitoredMACsOnStartup(uuids: Set<UUID>) {
         // ── 1. Restore persisted MAC→UUID mappings from UserDefaults ──
         let savedMACToUUID = loadPersistedMACs()
+        // Track which MACs came from persistence so we can inject them
+        // into currently-monitored devices whose UUIDs have rotated.
+        var orphanedMACs: [String: String] = [:]  // MAC → name hint
         for (mac, uuidStr) in savedMACToUUID {
-            guard let uuid = UUID(uuidString: uuidStr), uuids.contains(uuid) else { continue }
-            if ble.devices[uuid] == nil {
-                let device = Device(uuid: uuid)
-                device.macAddr = mac
-                ble.devices[uuid] = device
-                print("Startup MAC restored from persistence: \(uuid) → \(mac)")
+            guard let uuid = UUID(uuidString: uuidStr) else { continue }
+            if uuids.contains(uuid) {
+                if ble.devices[uuid] == nil {
+                    let device = Device(uuid: uuid)
+                    device.macAddr = mac
+                    ble.devices[uuid] = device
+                    print("Startup MAC restored from persistence: \(uuid) → \(mac)")
+                }
+            } else {
+                // UUID rotated — save MAC for later injection
+                orphanedMACs[mac] = uuidStr
             }
         }
         // ── 2. Try IOBluetooth for any remaining UUIDs ──
@@ -359,7 +367,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         // has rotated since the last session.
         for uuid in uuids where ble.devices[uuid] == nil {
             let device = Device(uuid: uuid)
-            if let info = getLEDeviceInfoFromUUID(uuid.uuidString) {
+            // Try to inject an orphaned MAC from step 1 (UUID rotated but MAC persisted)
+            var injected = false
+            if !orphanedMACs.isEmpty {
+                let name = monitoredDeviceTitle(uuid: uuid).lowercased()
+                for (mac, oldUUIDStr) in orphanedMACs {
+                    guard let oldUUID = UUID(uuidString: oldUUIDStr) else { continue }
+                    let oldName = monitoredDeviceTitle(uuid: oldUUID).lowercased()
+                    if name == oldName, name != uuid.uuidString.lowercased() {
+                        device.macAddr = mac
+                        injected = true
+                        print("Startup MAC injected from orphan: \(uuid) → \(mac) (matched by name)")
+                        break
+                    }
+                }
+            }
+            if !injected, let info = getLEDeviceInfoFromUUID(uuid.uuidString) {
                 device.macAddr = info.macAddr
             }
             ble.devices[uuid] = device
