@@ -201,7 +201,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     func menuWillOpen(_ menu: NSMenu) {
         if menu == deviceMenu {
             deviceMenuIsOpen = false
-            refreshDeviceMenuSelectionStates()
+            refreshDeviceMenuSelectionStates(removeStale: false)
             deviceMenuNeedsRefresh = false
             ensureGroupSeparatorExists()
             performDeviceMenuReorder()
@@ -258,10 +258,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
             deviceMenuIsOpen = false
             deviceMenuNeedsReorder = false   // cancel any stale async dispatch from tracking period
             ble.stopScanning()
-            if deviceMenuNeedsRefresh {
-                refreshDeviceMenuSelectionStates()
-                deviceMenuNeedsRefresh = false
-            }
+            refreshDeviceMenuSelectionStates(removeStale: true)
             // Final reorder to clean up any ordering drift from items appended during tracking
             performDeviceMenuReorder()
         }
@@ -322,10 +319,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     /// Persisted MACs are critical for re‑identifying devices whose BLE UUID rotates
     /// while BLEUnlock was not running.
     func resolveMonitoredMACsOnStartup(uuids: Set<UUID>) {
-        // ── 1. Restore persisted MACs from UserDefaults ──
-        let savedMACs = loadPersistedMACs()
-        for uuid in uuids {
-            if ble.devices[uuid] == nil, let mac = savedMACs[uuid] {
+        // ── 1. Restore persisted MAC→UUID mappings from UserDefaults ──
+        let savedMACToUUID = loadPersistedMACs()
+        for (mac, uuidStr) in savedMACToUUID {
+            guard let uuid = UUID(uuidString: uuidStr), uuids.contains(uuid) else { continue }
+            if ble.devices[uuid] == nil {
                 let device = Device(uuid: uuid)
                 device.macAddr = mac
                 ble.devices[uuid] = device
@@ -367,6 +365,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
             ble.devices[uuid] = device
         }
     }
+
 
     /// Replace old UUID with new UUID in insertion order, preserving position.
     func replaceUUIDInInsertionOrder(old: UUID, new: UUID) {
@@ -748,31 +747,31 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         persistDeviceMACs()
     }
 
-    /// Persist known MAC addresses for currently‑monitored devices so they survive
-    /// app restarts and UUID rotations.
+    /// Persist MAC→UUID mappings for currently monitored devices so they survive
+    /// app restarts and UUID rotations. Keyed by MAC address (one MAC = one monitored
+    /// device at any time; the latest monitored UUID wins).
+    /// Merges with existing entries to avoid losing mappings written by other code paths.
     func persistDeviceMACs() {
-        var dict: [String: String] = [:]
+        var dict = prefs.dictionary(forKey: "deviceMACs") as? [String: String] ?? [:]
+        let monitoredUUIDStrings = Set(ble.monitoredUUIDs.map { $0.uuidString })
         for uuid in ble.monitoredUUIDs {
-            if let mac = ble.devices[uuid]?.macAddr {
-                dict[uuid.uuidString] = mac
-            }
+            guard let mac = ble.devices[uuid]?.macAddr else { continue }
+            dict[mac] = uuid.uuidString
         }
+        // Prune entries for UUIDs that are no longer monitored
+        dict = dict.filter { _, uuidStr in monitoredUUIDStrings.contains(uuidStr) }
         prefs.set(dict, forKey: "deviceMACs")
     }
 
-    /// Load MAC addresses persisted from a previous session.
-    func loadPersistedMACs() -> [UUID: String] {
-        guard let dict = prefs.dictionary(forKey: "deviceMACs") as? [String: String] else { return [:] }
-        var result: [UUID: String] = [:]
-        for (key, mac) in dict {
-            if let uuid = UUID(uuidString: key) {
-                result[uuid] = mac
-            }
-        }
-        return result
+
+    /// Load persisted MAC→UUID mappings from previous sessions.
+    /// Returns [MAC: UUIDString] for efficient MAC-keyed lookup.
+    func loadPersistedMACs() -> [String: String] {
+        return prefs.dictionary(forKey: "deviceMACs") as? [String: String] ?? [:]
     }
 
-    func refreshDeviceMenuSelectionStates() {
+
+    func refreshDeviceMenuSelectionStates(removeStale: Bool = true) {
         ensureMonitoredDeviceMenuItems()
         var staleUUIDs: [UUID] = []
         for (uuid, menuItem) in deviceDict {
@@ -798,12 +797,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
                 }
             }
         }
-        for uuid in staleUUIDs {
-            if let menuItem = deviceDict[uuid] {
-                menuItem.menu?.removeItem(menuItem)
+        if removeStale {
+            for uuid in staleUUIDs {
+                if let menuItem = deviceDict.removeValue(forKey: uuid) {
+                    menuItem.menu?.removeItem(menuItem)
+                }
+                deviceCheckboxDict.removeValue(forKey: uuid)
+                deviceInsertionOrder.removeAll { $0 == uuid }
             }
-            deviceDict.removeValue(forKey: uuid)
-            deviceCheckboxDict.removeValue(forKey: uuid)
         }
     }
 
