@@ -201,10 +201,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     let wakeUnlockMaxRetries = 8
 
     func menuWillOpen(_ menu: NSMenu) {
-        if menu == mainMenu {
-            ble.startScanning()
-            return
-        }
         if menu == deviceMenu {
             deviceMenuIsOpen = false
             refreshDeviceMenuSelectionStates(removeStale: false)
@@ -212,6 +208,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
             ensureGroupSeparatorExists()
             performDeviceMenuReorder()
             deviceMenuIsOpen = true
+            ble.startScanning()
         } else if menu == unlockSettingsMenu {
             updateSettingsMenu(menu,
                                logicKind: unlockLogicMenuItemKind,
@@ -259,13 +256,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     }
     
     func menuDidClose(_ menu: NSMenu) {
-        if menu == mainMenu {
-            ble.stopScanning()
-            return
-        }
         if menu == deviceMenu {
             deviceMenuIsOpen = false
             deviceMenuNeedsReorder = false
+            ble.stopScanning()
             refreshDeviceMenuSelectionStates(removeStale: true)
             performDeviceMenuReorder()
         }
@@ -2040,7 +2034,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     }
     
     func constructMenu() {
-        mainMenu.delegate = self
         monitorMenuItem = mainMenu.addItem(withTitle: t("device_not_set"), action: nil, keyEquivalent: "")
         
         var item: NSMenuItem

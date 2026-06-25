@@ -523,6 +523,9 @@ class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     }
 
     func stopScanning() {
+        // Keep scanMode true when devices are monitored so UUID rotations
+        // are still detected during background/locked-screen operation.
+        if !monitoredUUIDs.isEmpty { return }
         scanMode = false
         if monitoredStates.values.contains(where: { $0.active }) {
             centralMgr.stopScan()
@@ -630,6 +633,9 @@ class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         presence = !uuids.isEmpty
         shouldLock = false
         updateAggregateRSSI()
+        if !uuids.isEmpty {
+            scanMode = true
+        }
         scanForPeripherals()
     }
 
