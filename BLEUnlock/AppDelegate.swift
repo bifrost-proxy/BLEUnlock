@@ -150,7 +150,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     let ble = BLE()
     let mainMenu = NSMenu()
-    let deviceMenu = NSMenu()
+    var deviceMenu = NSMenu()
     let unlockSettingsMenu = NSMenu()
     let lockSettingsMenu = NSMenu()
     let timeoutMenu = NSMenu()
@@ -165,6 +165,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     var monitorDetailItems: [UUID: NSMenuItem] = [:]
     var monitorMenuItem : NSMenuItem?
     var lockNowMenuItem: NSMenuItem?
+    var deviceMenuItem: NSMenuItem?
     /// Serial queue for ServiceManagement XPC calls to avoid concurrent smd requests.
     let smdQueue = DispatchQueue(label: "com.github.Skyearn.BLEUnlock.smd")
     let prefs = UserDefaults.standard
@@ -213,17 +214,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
             deviceMenuIsOpen = true
             // Option-key toggle: check initial state before starting scan
             let initialOption = NSEvent.modifierFlags.contains(.option)
-            if deviceMenuShowDetails != initialOption {
-                deviceMenuShowDetails = initialOption
-                refreshAllDeviceTitles()
-            }
+            setDeviceMenuShowDetails(initialOption, forceRefresh: true)
             flagsEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
                 guard let self = self, self.deviceMenuIsOpen else { return event }
                 let newState = event.modifierFlags.contains(.option)
-                if self.deviceMenuShowDetails != newState {
-                    self.deviceMenuShowDetails = newState
-                    self.refreshAllDeviceTitles()
-                }
+                self.setDeviceMenuShowDetails(newState)
                 return event
             }
             ble.startScanning()
@@ -302,8 +297,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
                 NSEvent.removeMonitor(monitor)
                 flagsEventMonitor = nil
             }
-            deviceMenuShowDetails = false
             deviceMaxTitleWidth.removeAll()
+            setDeviceMenuShowDetails(false, forceRefresh: true)
+            replaceDeviceMenuInstancePreservingItems()
         }
     }
     
@@ -530,7 +526,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         // and re-add in desired order. Safe because performDeviceMenuReorder
         // only runs when the menu is not being tracked.
         let devStart = 2
-        let beforeCount = deviceMenu.numberOfItems
         while deviceMenu.numberOfItems > devStart {
             deviceMenu.removeItem(at: devStart)
         }
@@ -901,14 +896,44 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
 
 
     /// Refresh all device menu item titles (called on Option-key toggle).
-    func refreshAllDeviceTitles() {
+    func setDeviceMenuShowDetails(_ showDetails: Bool, forceRefresh: Bool = false) {
+        guard forceRefresh || deviceMenuShowDetails != showDetails else { return }
+        deviceMenuShowDetails = showDetails
+        deviceMaxTitleWidth.removeAll()
+        refreshAllDeviceTitles(rebuildViews: true)
+    }
+
+    func refreshAllDeviceTitles(rebuildViews: Bool = false) {
         for (uuid, _) in deviceDict {
-            if let device = ble.devices[uuid], let checkbox = deviceCheckboxDict[uuid] {
-                updateDeviceCheckbox(checkbox, uuid: uuid, title: menuItemTitle(device: device, showDetails: deviceMenuShowDetails))
+            if let device = ble.devices[uuid] {
+                let title = menuItemTitle(device: device, showDetails: deviceMenuShowDetails)
+                if rebuildViews, let menuItem = deviceDict[uuid] {
+                    menuItem.view = nil
+                    deviceCheckboxDict[uuid] = configureDeviceMenuView(menuItem, uuid: uuid, title: title)
+                } else if let checkbox = deviceCheckboxDict[uuid] {
+                    updateDeviceCheckbox(checkbox, uuid: uuid, title: title)
+                }
             }
         }
         deviceMenu.minimumWidth = 0
         deviceMenu.update()
+    }
+
+    func replaceDeviceMenuInstancePreservingItems() {
+        let oldMenu = deviceMenu
+        let replacement = NSMenu()
+        replacement.delegate = self
+        replacement.autoenablesItems = oldMenu.autoenablesItems
+        replacement.minimumWidth = 0
+
+        while oldMenu.numberOfItems > 0 {
+            guard let item = oldMenu.item(at: 0) else { break }
+            oldMenu.removeItem(at: 0)
+            replacement.addItem(item)
+        }
+
+        deviceMenu = replacement
+        deviceMenuItem?.submenu = replacement
     }
 
     func refreshDeviceMenuSelectionStates(removeStale: Bool = true) {
@@ -2130,6 +2155,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         item = mainMenu.addItem(withTitle: "", action: nil, keyEquivalent: "")
         item.attributedTitle = deviceListAttributedTitle()
         item.submenu = deviceMenu
+        deviceMenuItem = item
         deviceMenu.delegate = self
         // Hint at top (static, never reordered)
         let hint = NSMenuItem(title: t("pair_for_mac_hint"), action: #selector(openBluetoothSettings), keyEquivalent: "")
