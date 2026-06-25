@@ -13,8 +13,8 @@
 
 - **Feat:** Hold ⌥ (Option) to show full MAC address and UUID — default menu displays device name and RSSI only.
 - **Feat:** UUID-only devices show collapsed `XXXX…YYYY` format for readability.
-- **Feat:** Clickable hint "配对以稳定追踪随机地址 →" opens Bluetooth settings.
-- **Feat:** ⌥ indicator on "设备列表" main menu item.
+- **Feat:** Clickable hint to pair devices opens Bluetooth settings.
+- **Feat:** ⌥ indicator on "Device List" main menu item.
 <details>
 <summary>中文发布说明</summary>
 
