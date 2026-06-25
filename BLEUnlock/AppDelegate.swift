@@ -270,7 +270,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         var desc : String!
         if let mac = device.macAddr {
             let prettifiedMac = mac.replacingOccurrences(of: "-", with: ":").uppercased()
-            desc = String(format: "%@ (%@)", device.description, prettifiedMac)
+            desc = String(format: "%@ (%@) (%@)", device.description, prettifiedMac, String(device.uuid.uuidString.prefix(8)))
         } else {
             desc = device.description
         }
