@@ -394,7 +394,7 @@ class MonitoredDeviceState {
 
 /// Cached paired device list for IOBluetooth MAC resolution.
 /// Refreshed lazily to avoid querying system daemon on every BLE discovery.
-var cachedPairedDevices: [(name: String, address: String)]?
+var cachedPairedDevices: [(name: String, address: String, hasDeviceClass: Bool)]?
 var cachedPairedDevicesTimestamp: TimeInterval = 0
 let pairedDevicesCacheTTL: TimeInterval = 30
 
@@ -410,20 +410,25 @@ func refreshPairedDevicesCache() {
         guard let dev = d as? IOBluetoothDevice,
               let name = dev.name,
               let addr = dev.addressString else { return nil }
-        return (name: name, address: addr)
+        let hasClass = dev.deviceClassMajor != 0 || dev.deviceClassMinor != 0
+        return (name: name, address: addr, hasDeviceClass: hasClass)
     }
 }
 
 func resolveMACForDeviceName(_ name: String) -> String? {
     refreshPairedDevicesCache()
     guard let devices = cachedPairedDevices else { return nil }
-    var match: String?
-    for device in devices {
-        guard device.name.caseInsensitiveCompare(name) == .orderedSame else { continue }
-        if match != nil { return nil } // Ambiguous
-        match = device.address
+    // Collect all name matches
+    let matches = devices.filter { $0.name.caseInsensitiveCompare(name) == .orderedSame }
+    if matches.isEmpty { return nil }
+    if matches.count == 1 { return matches[0].address }
+    // Ambiguous: prefer the entry with a device class (classic Bluetooth paired device)
+    // over BLE-only entries which typically have no device class.
+    if let classic = matches.first(where: { $0.hasDeviceClass }) {
+        return classic.address
     }
-    return match
+    // All are BLE-only — return the first
+    return matches[0].address
 }
 
 class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
