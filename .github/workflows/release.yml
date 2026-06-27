@@ -96,12 +96,12 @@ jobs:
           DMG_PATH="build/Build/Products/Release/BLEUnlock-${RELEASE_TAG}.dmg"
           if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
             gh release upload "${RELEASE_TAG}" "${DMG_PATH}" --clobber
-            gh release edit "${RELEASE_TAG}" --title "${RELEASE_TAG}" --notes-file CHANGELOG.md
+            gh release edit "${RELEASE_TAG}" --title "${RELEASE_TAG}" --notes-file <(sed -n "/^## ${RELEASE_TAG#v}/,/^## /p" CHANGELOG.md | sed "$d")
           else
             gh release create "${RELEASE_TAG}" \
               "${DMG_PATH}" \
               --title "${RELEASE_TAG}" \
-              --notes-file CHANGELOG.md
+              --notes-file <(sed -n "/^## ${RELEASE_TAG#v}/,/^## /p" CHANGELOG.md | sed "$d")
           fi
 
       - name: Update Homebrew Tap
