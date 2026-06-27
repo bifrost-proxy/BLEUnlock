@@ -36,7 +36,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: refs/tags/v1.14.3
+          ref: refs/heads/master
 
       - name: Build Release App
         run: |
