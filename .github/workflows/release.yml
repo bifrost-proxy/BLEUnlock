@@ -89,6 +89,47 @@ jobs:
             "${DEST_DIR}"
           mv "${DEST_DIR}/BLEUnlock.dmg" "${DEST_DIR}/BLEUnlock-${RELEASE_TAG}.dmg"
 
+
+      - name: Merge Changelog
+        run: |
+          python3 << 'MERGE_EOF'
+          import re
+
+          def parse_blocks(text):
+              blocks = re.split(r'\n(?=## \d)', text)
+              result = {}
+              for block in blocks[1:]:
+                  m = re.match(r'(## [\d.]+)\n(.*)', block, re.DOTALL)
+                  if m:
+                      body = m.group(2).strip()
+                      if body:
+                          result[m.group(1)] = body
+              return result
+
+          with open('CHANGELOG.md') as f: en = parse_blocks(f.read())
+          with open('CHANGELOG.cn.md') as f: cn = parse_blocks(f.read())
+          with open('CHANGELOG.ja.md') as f: ja = parse_blocks(f.read())
+
+          versions = list(en.keys())
+
+          with open('CHANGELOG.md', 'w') as f:
+              f.write('# Release Notes\n\n')
+              for ver in versions:
+                  f.write(f'{ver}\n\n')
+                  f.write(en.get(ver, '') + '\n')
+                  cn_body = cn.get(ver, '')
+                  if cn_body:
+                      f.write(f'\n<details>\n<summary>中文发布说明</summary>\n\n')
+                      f.write(cn_body + '\n')
+                      f.write('</details>\n')
+                  ja_body = ja.get(ver, '')
+                  if ja_body:
+                      f.write(f'\n<details>\n<summary>日本語リリースノート</summary>\n\n')
+                      f.write(ja_body + '\n')
+                      f.write('</details>\n')
+                  f.write('\n')
+          MERGE_EOF
+
       - name: Create or Update GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
