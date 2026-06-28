@@ -1,6 +1,6 @@
-"about" = "关于BLEUnlock";
+"about" = "关于 BLEUnlock";
 "automatically_check_for_updates" = "自动检查更新";
-"bluetooth_power_warn" = "蓝牙已关闭。要使BLEUnlock正常工作，请将其打开。";
+"bluetooth_power_warn" = "蓝牙已关闭。要使 BLEUnlock 正常工作，请将其打开。";
 "cancel" = "取消";
 "check_for_updates" = "检查更新…";
 "closer" = "⬆接近";
@@ -9,8 +9,8 @@
 "device_not_set" = "未选择设备";
 "disabled" = "禁用";
 "enter_password" = "输入密码以解锁电脑。";
-"enter_rssi_threshold" = "输入最小RSSI";
-"enter_rssi_threshold_info" = "扫描设备时会忽略RSSI值低于该值的设备。";
+"enter_rssi_threshold" = "输入最小 RSSI";
+"enter_rssi_threshold_info" = "扫描设备时会忽略 RSSI 值低于该值的设备。";
 "farther" = "⬇远离";
 "launch_at_login" = "开机启动";
 "lock_delay" = "延迟锁定";
@@ -37,7 +37,7 @@
 "all_short" = "全部";
 "not_detected" = "未检测到信息";
 "notification_device_away" = "设备掉线";
-"notification_locked" = "本电脑已被BLEUnlock锁定";
+"notification_locked" = "本电脑已被 BLEUnlock 锁定";
 "notification_lost_signal" = "信号丢失";
 "notification_update_available" = "发现新版本。";
 "ok" = "确定";
@@ -46,11 +46,11 @@
 "password_info" = "您的密码将安全地存储在钥匙串中。";
 "password_not_set" = "密码未设置。";
 "pause_now_playing" = "锁定时暂停\"播放中\"";
-"quit" = "退出BLEUnlock";
+"quit" = "退出 BLEUnlock";
 "scanning" = "扫描中…";
 "seconds" = "秒钟";
 "set_password" = "设置密码…";
-"set_rssi_threshold" = "设置最小RSSI…";
+"set_rssi_threshold" = "设置最小 RSSI…";
 "sleep_display" = "锁定时关闭屏幕";
 "timeout" = "无信号超时";
 "update_available_message" = "发现 BLEUnlock %1$@ 新版本。";
