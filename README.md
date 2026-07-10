@@ -9,7 +9,7 @@ BLEUnlock 是一款常驻菜单栏的小工具，可以根据 iPhone、Apple Wat
 
 本文档也提供 [English](README.en.md) 版本。
 
-> 本仓库是原始项目 [ts1/BLEUnlock](https://github.com/ts1/BLEUnlock) 的 fork，原项目由 Takeshi Sone 创建。感谢 Takeshi Sone 以 MIT 协议开源 BLEUnlock，也感谢所有为原项目贡献代码、翻译和想法的贡献者。
+> 本仓库是原始项目 [ts1/BLEUnlock](https://github.com/ts1/BLEUnlock) 的 fork，原项目由 Takeshi Sone 创建。感谢 Takeshi Sone 以 MIT 协议开源 BLEUnlock，也感谢为核心功能、CI 和安装发布能力做出贡献的开发者。
 
 ## 功能
 
@@ -259,23 +259,30 @@ do shell script "/usr/local/bin/ffmpeg -f avfoundation -r 30 -i 0 -frames:v 1 -y
 之所以需要这个 app，是因为 BLEUnlock 本身没有相机权限。
 把相机权限授予这个 app，就可以绕过这个限制。
 
-## Fork 来源
+## 开发与发布
+
+本仓库通过功能分支和 Pull Request 合入 `master`。提交前必须执行本地编译、启动和 DMG 打包总门禁：
+
+```sh
+source ~/.zshrc
+scripts/build-local.sh --verify
+```
+
+该命令只依赖 macOS Command Line Tools，会使用隔离的 Bundle ID 完成编译、短时启动、签名检查、DMG、SHA-256 和只读挂载验收，不会触发自动锁屏或自动解锁。正式 Release 仍由 GitHub Actions 使用完整 Xcode 构建。
+
+- 完整开发、测试、Review、PR 和 CI 规则见 [agents.md](agents.md)。
+- 正式 tag、GitHub Release 和 Homebrew 发布流程见 [docs/RELEASING.md](docs/RELEASING.md)。
+- 用户文档只维护当前中文 README 和 [English README](README.en.md)；功能、安装和安全说明有变化时必须同步更新两份文档。
+
+## 项目来源与技术致谢
 
 这个 Bifrost Proxy fork 基于 Takeshi Sone 的原始项目 [ts1/BLEUnlock](https://github.com/ts1/BLEUnlock)，并在当前仓库中继续维护、发布和进行功能调整。
 
-感谢 Takeshi Sone 打下的项目基础，也感谢所有长期贡献修复、本地化和使用反馈的贡献者。
-
-## 致谢
-
 - [Takeshi Sone](https://github.com/ts1): BLEUnlock 原作者与项目基础
-- [peiit](https://github.com/peiit): 中文翻译
 - [wenmin-wu](https://github.com/wenmin-wu): 最小 RSSI 和移动平均
 - [stephengroat](https://github.com/stephengroat): CI
 - [joeyhoer](https://github.com/joeyhoer): Homebrew Cask
-- [cyberclaus](https://github.com/cyberclaus): 德语、瑞典语、挪威语（Bokmål）和丹麦语本地化
-- [alonewolfx2](https://github.com/alonewolfx2): 土耳其语本地化
 - [wernjie](https://github.com/wernjie): 唤醒时不解锁
-- [tokfrans03](https://github.com/tokfrans03): 语言修正
 
 图标基于 materialdesignicons.com 提供的 SVG 文件制作，
 原始设计由 Google LLC 提供，遵循 Apache License 2.0。
