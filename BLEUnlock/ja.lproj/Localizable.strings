@@ -13,6 +13,9 @@
 "enter_rssi_threshold_info" = "この値よりRSSIが小さいデバイスはスキャンに表示されません。";
 "farther" = "⬇遠い";
 "launch_at_login" = "ログイン時に起動";
+"run_in_background" = "バックグラウンドで実行（メニューバーアイコンを非表示）";
+"run_in_background_info" = "BLEUnlock はメニューバーアイコンを表示せずに実行を続けます。アイコンを復元するには、アプリケーションから BLEUnlock をもう一度開いてください。";
+"hide_menu_bar_icon" = "アイコンを非表示";
 "lock_delay" = "ロックするまでの遅延";
 "lock_now" = "今すぐロック";
 "lock_rssi" = "ロック信号強度";

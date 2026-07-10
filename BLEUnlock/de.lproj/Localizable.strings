@@ -10,6 +10,9 @@
 "enter_rssi_threshold_info" = "Gerät mit geringerem RSSI als diesem Wert wird beim Scannen ignoriert.";
 "farther" = "⬇weiter";
 "launch_at_login" = "Beim Login starten";
+"run_in_background" = "Im Hintergrund ausführen (Menüleistensymbol ausblenden)";
+"run_in_background_info" = "BLEUnlock läuft ohne Menüleistensymbol weiter. Öffnen Sie BLEUnlock erneut aus dem Programme-Ordner, um das Symbol wieder anzuzeigen.";
+"hide_menu_bar_icon" = "Symbol ausblenden";
 "lock_delay" = "Sperrverzögerung";
 "lock_now" = "Jetzt sperren";
 "lock_rssi" = "RSSI Sperren";

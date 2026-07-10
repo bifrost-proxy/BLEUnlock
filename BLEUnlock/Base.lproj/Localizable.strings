@@ -13,6 +13,9 @@
 "enter_rssi_threshold_info" = "Device whose RSSI is less than this value will be ignored while scanning.";
 "farther" = "⬇Farther";
 "launch_at_login" = "Launch at Login";
+"run_in_background" = "Run in Background (Hide Menu Bar Icon)";
+"run_in_background_info" = "BLEUnlock will keep running without a menu bar icon. Open BLEUnlock again from Applications to show the icon.";
+"hide_menu_bar_icon" = "Hide Icon";
 "lock_delay" = "Delay to Lock";
 "lock_now" = "Lock Screen Now";
 "lock_rssi" = "Lock RSSI";

@@ -10,6 +10,9 @@
 "enter_rssi_threshold_info" = "Enhet der RSSI er mindre enn denne verdien, ignoreres under skanning.";
 "farther" = "⬇Lenger unna";
 "launch_at_login" = "Start ved innlogging";
+"run_in_background" = "Kjør i bakgrunnen (skjul menylinjeikonet)";
+"run_in_background_info" = "BLEUnlock fortsetter å kjøre uten et ikon på menylinjen. Åpne BLEUnlock igjen fra Programmer for å vise ikonet.";
+"hide_menu_bar_icon" = "Skjul ikon";
 "lock_delay" = "Forsinkelse for låsing";
 "lock_now" = "Lås skjerm nå";
 "lock_rssi" = "Lås RSSI";
