@@ -6,11 +6,11 @@ class AboutBox: NSWindowController, NSWindowDelegate {
     @IBOutlet weak var versionLabel: NSTextField!
 
     @IBAction func visitHomepage(_ sender: Any) {
-        NSWorkspace.shared.open(URL(string: "https://github.com/Skyearn/BLEUnlock#readme")!)
+        NSWorkspace.shared.open(URL(string: "https://github.com/bifrost-proxy/BLEUnlock#readme")!)
     }
 
     @IBAction func checkReleases(_ sender: Any) {
-        NSWorkspace.shared.open(URL(string: "https://github.com/Skyearn/BLEUnlock/blob/master/CHANGELOG.md")!)
+        NSWorkspace.shared.open(URL(string: "https://github.com/bifrost-proxy/BLEUnlock/blob/master/CHANGELOG.md")!)
     }
     convenience init() {
         self.init(windowNibName: "AboutBox")

@@ -1,5 +1,10 @@
 # Release Notes
 
+## Unreleased
+
+- Move GitHub Releases, update checks, Homebrew publishing, and installation documentation to `bifrost-proxy`.
+- Change the app and Launcher bundle identifiers to `com.bifrost-proxy.BLEUnlock`, with migration support for preferences, Keychain data, login items, and event scripts from previous identifiers.
+- Add a checksum-verifying installation script and publish the Homebrew Cask as `bifrost-proxy/tap/unlock`.
 
 ## 1.14.3
 

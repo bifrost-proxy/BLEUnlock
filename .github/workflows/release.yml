@@ -3,52 +3,90 @@ name: Release
 on:
   push:
     tags:
-      - "*"
+      - "v[0-9]+.[0-9]+.[0-9]+"
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing git tag to build and release"
+        description: "Existing vX.Y.Z tag to build and release"
         required: true
+        type: string
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  TAP_REPOSITORY: bifrost-proxy/homebrew-tap
+
 jobs:
   build-and-release:
     runs-on: macos-26
-    env:
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
 
     steps:
-      - name: Import Code Signing Certificate
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+
+      - name: Validate release metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must match vX.Y.Z: ${RELEASE_TAG}" >&2
+            exit 1
+          fi
+
+          VERSION="${RELEASE_TAG#v}"
+          if ! grep -q "^## ${VERSION}$" CHANGELOG.md; then
+            echo "CHANGELOG.md has no section for ${VERSION}." >&2
+            exit 1
+          fi
+
+          TAG_COMMIT="$(git rev-list -n 1 "${RELEASE_TAG}")"
+          HEAD_COMMIT="$(git rev-parse HEAD)"
+          if [[ "${TAG_COMMIT}" != "${HEAD_COMMIT}" ]]; then
+            echo "Checked out ${HEAD_COMMIT}, but ${RELEASE_TAG} points to ${TAG_COMMIT}." >&2
+            exit 1
+          fi
+
+      - name: Import code-signing certificate
         env:
           MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
           MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        shell: bash
         run: |
-          if [ -z "${MACOS_CERT_P12_BASE64}" ]; then
-            echo "MACOS_CERT_P12_BASE64 is not set. Skipping code signing."
+          set -euo pipefail
+
+          if [[ -z "${MACOS_CERT_P12_BASE64}" ]]; then
+            echo "No signing certificate configured; the release will be unsigned."
             exit 0
           fi
 
-          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
-          CERT_PATH="$RUNNER_TEMP/cert.p12"
+          : "${MACOS_CERT_PASSWORD:?MACOS_CERT_PASSWORD is required when a certificate is configured}"
+          : "${KEYCHAIN_PASSWORD:?KEYCHAIN_PASSWORD is required when a certificate is configured}"
 
-          echo "${MACOS_CERT_P12_BASE64}" | base64 --decode > "${CERT_PATH}"
+          KEYCHAIN_PATH="${RUNNER_TEMP}/build.keychain-db"
+          CERT_PATH="${RUNNER_TEMP}/cert.p12"
 
+          printf '%s' "${MACOS_CERT_P12_BASE64}" | base64 --decode > "${CERT_PATH}"
           security create-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
           security set-keychain-settings -lut 21600 "${KEYCHAIN_PATH}"
           security unlock-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
           security import "${CERT_PATH}" -k "${KEYCHAIN_PATH}" -P "${MACOS_CERT_PASSWORD}" -T /usr/bin/codesign -T /usr/bin/security
           security list-keychains -d user -s "${KEYCHAIN_PATH}"
 
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', github.event.inputs.tag) || github.ref }}
-
-      - name: Build Release App
+      - name: Build release app
+        shell: bash
         run: |
+          set -euo pipefail
           VERSION="${RELEASE_TAG#v}"
           xcodebuild \
             -project BLEUnlock.xcodeproj \
@@ -60,127 +98,202 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
-      - name: Code Sign App
+      - name: Sign release app
         env:
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        shell: bash
         run: |
-          if [ -z "${MACOS_SIGNING_IDENTITY}" ]; then
-            echo "MACOS_SIGNING_IDENTITY is not set. Skipping code signing."
+          set -euo pipefail
+          APP_PATH="build/Build/Products/Release/BLEUnlock.app"
+
+          if [[ -z "${MACOS_SIGNING_IDENTITY}" ]]; then
+            echo "No signing identity configured; leaving the release unsigned."
             exit 0
           fi
 
-          APP_PATH="build/Build/Products/Release/BLEUnlock.app"
-          ENTITLEMENTS_PATH="BLEUnlock/BLEUnlock.entitlements"
-          /usr/bin/codesign --force --deep --options runtime --entitlements "${ENTITLEMENTS_PATH}" --sign "${MACOS_SIGNING_IDENTITY}" "${APP_PATH}"
+          /usr/bin/codesign \
+            --force \
+            --deep \
+            --options runtime \
+            --entitlements BLEUnlock/BLEUnlock.entitlements \
+            --sign "${MACOS_SIGNING_IDENTITY}" \
+            "${APP_PATH}"
+          /usr/bin/codesign --verify --deep --strict --verbose=2 "${APP_PATH}"
 
-      - name: Install create-dmg
+      - name: Verify app metadata
+        shell: bash
         run: |
-          npm install -g create-dmg
+          set -euo pipefail
+          APP_PATH="build/Build/Products/Release/BLEUnlock.app"
+          VERSION="${RELEASE_TAG#v}"
+          ACTUAL_VERSION="$(defaults read "${PWD}/${APP_PATH}/Contents/Info" CFBundleShortVersionString)"
+          BUNDLE_ID="$(defaults read "${PWD}/${APP_PATH}/Contents/Info" CFBundleIdentifier)"
+
+          [[ "${ACTUAL_VERSION}" == "${VERSION}" ]] || {
+            echo "Expected app version ${VERSION}, got ${ACTUAL_VERSION}." >&2
+            exit 1
+          }
+          [[ "${BUNDLE_ID}" == "com.bifrost-proxy.BLEUnlock" ]] || {
+            echo "Unexpected bundle identifier: ${BUNDLE_ID}." >&2
+            exit 1
+          }
 
       - name: Package DMG
+        shell: bash
         run: |
+          set -euo pipefail
+          npm install --global create-dmg
+
           APP_PATH="build/Build/Products/Release/BLEUnlock.app"
           DEST_DIR="build/Build/Products/Release"
+          DMG_PATH="${DEST_DIR}/BLEUnlock-${RELEASE_TAG}.dmg"
+
           create-dmg \
             --overwrite \
             --no-code-sign \
             --no-version-in-filename \
             "${APP_PATH}" \
             "${DEST_DIR}"
-          mv "${DEST_DIR}/BLEUnlock.dmg" "${DEST_DIR}/BLEUnlock-${RELEASE_TAG}.dmg"
+          mv "${DEST_DIR}/BLEUnlock.dmg" "${DMG_PATH}"
 
+          cd "${DEST_DIR}"
+          shasum -a 256 "$(basename "${DMG_PATH}")" > "$(basename "${DMG_PATH}").sha256"
 
-      - name: Merge Changelog
-        run: |
-          python3 << 'MERGE_EOF'
-          import re
-
-          def parse_blocks(text):
-              blocks = re.split(r'\n(?=## \d)', text)
-              result = {}
-              for block in blocks[1:]:
-                  m = re.match(r'(## [\d.]+)\n(.*)', block, re.DOTALL)
-                  if m:
-                      body = m.group(2).strip()
-                      if body:
-                          result[m.group(1)] = body
-              return result
-
-          with open('CHANGELOG.md') as f: en = parse_blocks(f.read())
-          with open('CHANGELOG.cn.md') as f: cn = parse_blocks(f.read())
-          with open('CHANGELOG.ja.md') as f: ja = parse_blocks(f.read())
-
-          versions = list(en.keys())
-
-          with open('CHANGELOG.md', 'w') as f:
-              f.write('# Release Notes\n\n')
-              for ver in versions:
-                  f.write(f'{ver}\n\n')
-                  f.write(en.get(ver, '') + '\n')
-                  cn_body = cn.get(ver, '')
-                  if cn_body:
-                      f.write(f'\n<details>\n<summary>中文发布说明</summary>\n\n')
-                      f.write(cn_body + '\n')
-                      f.write('</details>\n')
-                  ja_body = ja.get(ver, '')
-                  if ja_body:
-                      f.write(f'\n<details>\n<summary>日本語リリースノート</summary>\n\n')
-                      f.write(ja_body + '\n')
-                      f.write('</details>\n')
-                  f.write('\n')
-          MERGE_EOF
-
-      - name: Create or Update GitHub Release
+      - name: Notarize DMG
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        shell: bash
         run: |
+          set -euo pipefail
           DMG_PATH="build/Build/Products/Release/BLEUnlock-${RELEASE_TAG}.dmg"
+
+          if [[ -z "${APPLE_ID}${APPLE_TEAM_ID}${APPLE_APP_PASSWORD}" ]]; then
+            echo "Notarization credentials are not configured; skipping notarization."
+            exit 0
+          fi
+
+          : "${APPLE_ID:?APPLE_ID is required for notarization}"
+          : "${APPLE_TEAM_ID:?APPLE_TEAM_ID is required for notarization}"
+          : "${APPLE_APP_PASSWORD:?APPLE_APP_PASSWORD is required for notarization}"
+
+          xcrun notarytool submit "${DMG_PATH}" \
+            --apple-id "${APPLE_ID}" \
+            --team-id "${APPLE_TEAM_ID}" \
+            --password "${APPLE_APP_PASSWORD}" \
+            --wait
+          xcrun stapler staple "${DMG_PATH}"
+
+          cd "$(dirname "${DMG_PATH}")"
+          shasum -a 256 "$(basename "${DMG_PATH}")" > "$(basename "${DMG_PATH}").sha256"
+
+      - name: Build release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          version = os.environ["RELEASE_TAG"].removeprefix("v")
+
+          def section(path: str) -> str:
+              text = Path(path).read_text()
+              match = re.search(
+                  rf"^## {re.escape(version)}\s*$\n(.*?)(?=^## |\Z)",
+                  text,
+                  re.MULTILINE | re.DOTALL,
+              )
+              return match.group(1).strip() if match else ""
+
+          notes = [section("CHANGELOG.md")]
+          translations = [("中文发布说明", section("CHANGELOG.cn.md"))]
+          for summary, body in translations:
+              if body:
+                  notes.append(
+                      f"<details>\n<summary>{summary}</summary>\n\n{body}\n\n</details>"
+                  )
+
+          Path("release-notes.md").write_text("\n\n".join(filter(None, notes)) + "\n")
+          PY
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          DMG_PATH="build/Build/Products/Release/BLEUnlock-${RELEASE_TAG}.dmg"
+          CHECKSUM_PATH="${DMG_PATH}.sha256"
+
           if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
-            gh release upload "${RELEASE_TAG}" "${DMG_PATH}" --clobber
-            gh release edit "${RELEASE_TAG}" --title "${RELEASE_TAG}" --notes-file <(awk "/^## ${RELEASE_TAG#v}/{found=1; next} /^## /{found=0; exit} found" CHANGELOG.md)
+            gh release upload "${RELEASE_TAG}" "${DMG_PATH}" "${CHECKSUM_PATH}" --clobber
+            gh release edit "${RELEASE_TAG}" \
+              --title "BLEUnlock ${RELEASE_TAG}" \
+              --notes-file release-notes.md \
+              --latest
           else
             gh release create "${RELEASE_TAG}" \
               "${DMG_PATH}" \
-              --title "${RELEASE_TAG}" \
-              --notes-file <(awk "/^## ${RELEASE_TAG#v}/{found=1; next} /^## /{found=0; exit} found" CHANGELOG.md)
+              "${CHECKSUM_PATH}" \
+              --verify-tag \
+              --title "BLEUnlock ${RELEASE_TAG}" \
+              --notes-file release-notes.md \
+              --latest
           fi
 
-      - name: Update Homebrew Tap
+      - name: Update Homebrew tap
         env:
           TAP_PUSH_TOKEN: ${{ secrets.TAP_PUSH_TOKEN }}
+        shell: bash
         run: |
-          if [ -z "${TAP_PUSH_TOKEN}" ]; then
-            echo "TAP_PUSH_TOKEN is not set. Skipping Homebrew tap update."
-            exit 0
-          fi
+          set -euo pipefail
+          : "${TAP_PUSH_TOKEN:?TAP_PUSH_TOKEN must be configured to publish the Homebrew cask}"
 
           VERSION="${RELEASE_TAG#v}"
           DMG_PATH="build/Build/Products/Release/BLEUnlock-${RELEASE_TAG}.dmg"
           SHA256="$(shasum -a 256 "${DMG_PATH}" | awk '{print $1}')"
           TAP_DIR="${RUNNER_TEMP}/homebrew-tap"
-          CASK_PATH="${TAP_DIR}/Casks/bleunlock.rb"
+          CASK_PATH="${TAP_DIR}/Casks/unlock.rb"
 
-          git clone "https://x-access-token:${TAP_PUSH_TOKEN}@github.com/Skyearn/homebrew-tap.git" "${TAP_DIR}"
+          git clone "https://x-access-token:${TAP_PUSH_TOKEN}@github.com/${TAP_REPOSITORY}.git" "${TAP_DIR}"
+          mkdir -p "$(dirname "${CASK_PATH}")"
 
-          python3 - <<PY
-          from pathlib import Path
+          cat > "${CASK_PATH}" <<CASK
+          cask "unlock" do
+            version "${VERSION}"
+            sha256 "${SHA256}"
 
-          path = Path("${CASK_PATH}")
-          text = path.read_text()
-          text = text.replace(text.split('version "')[1].split('"')[0], "${VERSION}", 1)
-          text = text.replace(text.split('sha256 "')[1].split('"')[0], "${SHA256}", 1)
-          path.write_text(text)
-          PY
+            url "https://github.com/bifrost-proxy/BLEUnlock/releases/download/v#{version}/BLEUnlock-v#{version}.dmg"
+            name "BLEUnlock"
+            desc "Lock and unlock a Mac by proximity of a Bluetooth Low Energy device"
+            homepage "https://github.com/bifrost-proxy/BLEUnlock"
+
+            app "BLEUnlock.app"
+
+            zap trash: [
+              "~/Library/Application Scripts/com.bifrost-proxy.BLEUnlock",
+              "~/Library/Application Scripts/com.github.Skyearn.BLEUnlock",
+              "~/Library/Preferences/com.bifrost-proxy.BLEUnlock.plist",
+              "~/Library/Preferences/com.github.Skyearn.BLEUnlock.plist",
+            ]
+          end
+          CASK
 
           cd "${TAP_DIR}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          if git diff --quiet -- Casks/bleunlock.rb; then
+          if git diff --quiet -- Casks/unlock.rb && ! git ls-files --error-unmatch Casks/unlock.rb >/dev/null 2>&1; then
+            git add Casks/unlock.rb
+          elif git diff --quiet -- Casks/unlock.rb; then
             echo "Homebrew tap is already up to date."
             exit 0
+          else
+            git add Casks/unlock.rb
           fi
 
-          git add Casks/bleunlock.rb
-          git commit -m "Update BLEUnlock to ${RELEASE_TAG}"
-          git push origin main
+          git commit -m "Update unlock to ${RELEASE_TAG}"
+          git push origin HEAD:main
