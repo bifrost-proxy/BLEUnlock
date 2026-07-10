@@ -256,6 +256,24 @@ jobs:
               --latest
           fi
 
+      - name: Verify published installation script
+        shell: bash
+        run: |
+          set -euo pipefail
+          INSTALL_DIR="${RUNNER_TEMP}/script-install"
+          EXPECTED_VERSION="${RELEASE_TAG#v}"
+          mkdir -p "${INSTALL_DIR}"
+
+          BLEUNLOCK_INSTALL_DIR="${INSTALL_DIR}" \
+            bash install.sh --version "${RELEASE_TAG}" --no-launch
+
+          APP_PATH="${INSTALL_DIR}/BLEUnlock.app"
+          ACTUAL_VERSION="$(defaults read "${APP_PATH}/Contents/Info" CFBundleShortVersionString)"
+          BUNDLE_ID="$(defaults read "${APP_PATH}/Contents/Info" CFBundleIdentifier)"
+          [[ "${ACTUAL_VERSION}" == "${EXPECTED_VERSION}" ]]
+          [[ "${BUNDLE_ID}" == "com.bifrost-proxy.BLEUnlock" ]]
+          codesign --verify --deep --strict --verbose=4 "${APP_PATH}"
+
       - name: Update Homebrew tap
         env:
           TAP_PUSH_TOKEN: ${{ secrets.TAP_PUSH_TOKEN }}
