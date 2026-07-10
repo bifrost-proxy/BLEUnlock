@@ -57,6 +57,7 @@ brew install --cask bifrost-proxy/tap/unlock
 ```
 
 > Homebrew 使用 `owner/tap/cask` 命名；npm 风格的 `@bifrost-proxy/unlock` 不是有效的 Homebrew 语法。
+> 当前无 Developer ID 的发布会使用 ad-hoc 签名；Cask 会在完成 SHA-256 校验和安装后移除 App 的隔离标记。
 
 ### 使用安装脚本
 

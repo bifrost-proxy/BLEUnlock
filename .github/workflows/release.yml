@@ -67,6 +67,7 @@ jobs:
 
           if [[ -z "${MACOS_CERT_P12_BASE64}" ]]; then
             echo "No signing certificate configured; the release will use ad-hoc signing."
+            echo "DEVELOPER_ID_CONFIGURED=0" >> "${GITHUB_ENV}"
             exit 0
           fi
 
@@ -82,6 +83,7 @@ jobs:
           security unlock-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
           security import "${CERT_PATH}" -k "${KEYCHAIN_PATH}" -P "${MACOS_CERT_PASSWORD}" -T /usr/bin/codesign -T /usr/bin/security
           security list-keychains -d user -s "${KEYCHAIN_PATH}"
+          echo "DEVELOPER_ID_CONFIGURED=1" >> "${GITHUB_ENV}"
 
       - name: Build release app
         shell: bash
@@ -106,6 +108,9 @@ jobs:
         run: |
           set -euo pipefail
           APP_PATH="build/Build/Products/Release/BLEUnlock.app"
+          if [[ "${DEVELOPER_ID_CONFIGURED:-0}" != "1" ]]; then
+            export MACOS_SIGNING_IDENTITY="-"
+          fi
           bash scripts/sign-macos-app.sh "${APP_PATH}"
 
           if /usr/bin/codesign --display --verbose=4 "${APP_PATH}" 2>&1 | grep -q '^Signature=adhoc$'; then
@@ -265,6 +270,11 @@ jobs:
           TAP_DIR="${RUNNER_TEMP}/homebrew-tap"
           CASK_PATH="${TAP_DIR}/Casks/unlock.rb"
 
+          QUARANTINE_POSTFLIGHT=""
+          if [[ "${APP_SIGNING_MODE:-adhoc}" == "adhoc" ]]; then
+            QUARANTINE_POSTFLIGHT=$'\n            # The release is SHA-256 verified and ad-hoc signed.\n            postflight do\n              system_command "/usr/bin/xattr",\n                             args: ["-dr", "com.apple.quarantine", "#{appdir}/BLEUnlock.app"]\n            end\n'
+          fi
+
           git clone "https://x-access-token:${TAP_PUSH_TOKEN}@github.com/${TAP_REPOSITORY}.git" "${TAP_DIR}"
           mkdir -p "$(dirname "${CASK_PATH}")"
 
@@ -279,6 +289,7 @@ jobs:
             homepage "https://github.com/bifrost-proxy/BLEUnlock"
 
             app "BLEUnlock.app"
+          ${QUARANTINE_POSTFLIGHT}
 
             zap trash: [
               "~/Library/Application Scripts/com.bifrost-proxy.BLEUnlock",

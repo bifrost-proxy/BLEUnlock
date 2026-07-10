@@ -23,7 +23,7 @@
    - `APPLE_TEAM_ID`
    - `APPLE_APP_PASSWORD`
 
-没有签名相关 secrets 时仍可构建 Release，流水线会自动使用 ad-hoc 签名，并逐个签署内部 Mach-O、Launcher 和外层 App，再从 DMG 只读挂载后执行 `codesign --verify --deep --strict`。这可以避免未签名或签名不一致导致的“应用已损坏”，但 ad-hoc 签名不等于 Developer ID 信任，`spctl` 仍会拒绝它；要让 Homebrew 和普通下载用户稳定无拦截安装，必须配置 Developer ID 并完成 Apple 公证。`TAP_PUSH_TOKEN` 是正式发版的必需项；缺失时工作流会明确失败，不会把 Homebrew 未更新伪装成发版完成。
+没有签名相关 secrets 时仍可构建 Release，流水线会明确将签名 identity 降级为 `-`（ad-hoc），并逐个签署内部 Mach-O、Launcher 和外层 App，再从 DMG 只读挂载后执行 `codesign --verify --deep --strict`。ad-hoc Cask 会在 Homebrew 完成 SHA-256 校验和安装后移除 App 的 quarantine 标记，使当前没有 Developer ID 的发布也能启动；手动下载仍可能被 Gatekeeper 拦截。后续配置证书时，流水线会自动切换为 Developer ID + Apple 公证。`TAP_PUSH_TOKEN` 是正式发版的必需项；缺失时工作流会明确失败，不会把 Homebrew 未更新伪装成发版完成。
 
 ## 日常开发和上游同步
 
