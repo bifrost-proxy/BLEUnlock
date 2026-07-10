@@ -26,15 +26,25 @@ jobs:
         bash -n scripts/sign-macos-app.sh
         bash -n scripts/verify-macos-dmg.sh
         bash -n scripts/test-update-installer.sh
-    - name: Start xcodebuild test
+    - name: Build release configuration
       run: |
         xcodebuild clean build \
           -project BLEUnlock.xcodeproj \
           -scheme BLEUnlock \
+          -configuration Release \
           -derivedDataPath build-ci \
           CODE_SIGNING_ALLOWED=NO
-    - name: Ad-hoc sign and verify CI app
+    - name: Ad-hoc sign release app
       env:
         MACOS_SIGNING_IDENTITY: "-"
         MACOS_ENTITLEMENTS_PATH: BLEUnlock/BLEUnlock.entitlements
-      run: bash scripts/sign-macos-app.sh build-ci/Build/Products/Debug/BLEUnlock.app
+      run: bash scripts/sign-macos-app.sh build-ci/Build/Products/Release/BLEUnlock.app
+    - name: Package and verify release DMG
+      run: |
+        hdiutil create \
+          -volname BLEUnlock \
+          -srcfolder build-ci/Build/Products/Release/BLEUnlock.app \
+          -ov \
+          -format UDZO \
+          build-ci/BLEUnlock-ci.dmg
+        bash scripts/verify-macos-dmg.sh build-ci/BLEUnlock-ci.dmg

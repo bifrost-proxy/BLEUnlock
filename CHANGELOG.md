@@ -6,6 +6,8 @@
 
 - Add a verified in-app updater that downloads the release DMG and checksum, validates SHA-256, code signatures, bundle ID, and target version, then replaces and relaunches the installed app.
 - Compare semantic versions before offering an update, preventing an older GitHub release from being presented as an upgrade.
+- Make CI build, ad-hoc sign, package, mount, and verify the Release configuration before tags can reach the release workflow.
+- Explicitly fall back to ad-hoc signing without Developer ID and let the checksum-verified Homebrew Cask remove quarantine after installation.
 - Sign nested executables before the outer app in CI, Test Build, and Release; automatically fall back to ad-hoc signing without Developer ID and re-verify the mounted app from the packaged DMG.
 - Verify the app code signature before and after script installation, and reject release artifacts with an unexpected bundle ID.
 - Keep device-list discovery advertisement-only: never connect to unbound peripherals or probe their GATT services, preventing unrelated system connection prompts from nearby glasses, headphones, and other devices.

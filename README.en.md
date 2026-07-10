@@ -57,6 +57,7 @@ brew install --cask bifrost-proxy/tap/unlock
 ```
 
 > Homebrew uses `owner/tap/cask` names. The npm-style name `@bifrost-proxy/unlock` is not valid Homebrew syntax.
+> Releases without Developer ID use ad-hoc signing; the Cask removes the app quarantine attribute only after Homebrew verifies SHA-256 and installs the app.
 
 ### Using the installation script
 
