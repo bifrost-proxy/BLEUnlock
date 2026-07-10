@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.15.1
+
+- Validate the complete two-version release, Homebrew installation, update detection, verified replacement, and relaunch path.
+- Keep the generated Homebrew Cask compatible with current Homebrew and validate its Ruby syntax before publishing.
+
 ## 1.15.0
 
 - Add a verified in-app updater that downloads the release DMG and checksum, validates SHA-256, code signatures, bundle ID, and target version, then replaces and relaunches the installed app.
