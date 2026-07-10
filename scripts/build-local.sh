@@ -79,7 +79,7 @@ if ! [[ "${SMOKE_SECONDS}" =~ ^[0-9]+$ ]] || [[ "${SMOKE_SECONDS}" -lt 1 ]]; the
   exit 2
 fi
 
-for command in xcrun uname plutil codesign hdiutil shasum; do
+for command in xcrun uname plutil codesign hdiutil shasum file; do
   if ! command -v "${command}" >/dev/null 2>&1; then
     echo "Required command not found: ${command}" >&2
     exit 1
@@ -152,10 +152,9 @@ cp "${ROOT_DIR}/BLEUnlock/Images.xcassets/StatusBarDisconnected.imageset/unlock-
 cp "${ROOT_DIR}/BLEUnlock/Images.xcassets/StatusBarConnected.imageset/app.pdf" \
   "${RESOURCES_DIR}/StatusBarConnected.pdf"
 
-codesign --force --sign - \
-  --entitlements "${ROOT_DIR}/BLEUnlock/BLEUnlock.entitlements" \
-  "${APP_DIR}"
-codesign --verify --deep --strict --verbose=2 "${APP_DIR}"
+MACOS_SIGNING_IDENTITY=- \
+MACOS_ENTITLEMENTS_PATH="${ROOT_DIR}/BLEUnlock/BLEUnlock.entitlements" \
+  bash "${ROOT_DIR}/scripts/sign-macos-app.sh" "${APP_DIR}"
 
 echo "Built ${APP_DIR}"
 
@@ -195,6 +194,9 @@ package_local_app() {
   test -L "${MOUNT_DIR}/Applications"
   hdiutil detach "${MOUNT_DIR}" -quiet
   MOUNT_ATTACHED=0
+
+  EXPECTED_BUNDLE_ID="${BUNDLE_ID}" \
+    bash "${ROOT_DIR}/scripts/verify-macos-dmg.sh" "${DMG_PATH}"
 
   echo "PASS: packaged and mounted ${DMG_PATH}"
   echo "Checksum: ${CHECKSUM_PATH}"

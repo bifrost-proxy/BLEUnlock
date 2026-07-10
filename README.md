@@ -64,13 +64,13 @@ brew install --cask bifrost-proxy/tap/unlock
 curl -fsSL https://raw.githubusercontent.com/bifrost-proxy/BLEUnlock/master/install.sh | bash
 ```
 
-脚本会从本仓库下载最新 DMG 和校验文件，校验 SHA-256 后覆盖安装到 `/Applications/BLEUnlock.app`。
+脚本会从本仓库下载最新 DMG 和校验文件，校验 SHA-256、App 签名完整性和 Bundle ID 后覆盖安装到 `/Applications/BLEUnlock.app`，并对安装结果再次执行签名校验。
 
 ### 手动安装
 
 从 [Releases](https://github.com/bifrost-proxy/BLEUnlock/releases) 下载 dmg 文件，打开后将 BLEUnlock 拖到“应用程序”文件夹。
 
-> 注意：这个 fork 没有加入 Apple Developer Program，因此发布版本无法使用 Apple Developer ID 进行分发签名和公证。首次启动时，macOS 可能会拦截应用。
+> 发布流水线始终会校验应用签名完整性：配置 Developer ID 时使用正式签名和公证，否则使用 ad-hoc 签名，避免因内部可执行文件未签名或签名不一致而出现“应用已损坏”。ad-hoc 签名不能证明开发者身份，macOS 仍可能在首次启动时拦截；可在 Finder 中右键应用并选择“打开”。
 >
 > 首次双击打开时，macOS 会弹出「无法验证是否包含恶意软件」的提示，只有「完成」和「移到废纸篓」两个按钮。请按下面的流程处理：
 > 1. 先将 `BLEUnlock.app` 移动到 `/Applications`。

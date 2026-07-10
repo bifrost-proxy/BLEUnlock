@@ -53,7 +53,7 @@ done
 
 [[ "$(uname -s)" == "Darwin" ]] || die "macOS is required"
 
-for command in curl hdiutil shasum ditto; do
+for command in curl hdiutil shasum ditto codesign defaults; do
   command -v "${command}" >/dev/null 2>&1 || die "required command not found: ${command}"
 done
 
@@ -102,6 +102,13 @@ source_app="${mount_point}/BLEUnlock.app"
 destination_app="${INSTALL_DIR%/}/BLEUnlock.app"
 [[ -d "${source_app}" ]] || die "BLEUnlock.app is missing from the DMG"
 
+codesign --verify --deep --strict --verbose=2 "${source_app}" || \
+  die "BLEUnlock.app has an invalid or incomplete code signature"
+
+bundle_id="$(defaults read "${source_app}/Contents/Info" CFBundleIdentifier)"
+[[ "${bundle_id}" == "com.bifrost-proxy.BLEUnlock" ]] || \
+  die "unexpected bundle identifier: ${bundle_id}"
+
 osascript -e 'tell application id "com.bifrost-proxy.BLEUnlock" to quit' >/dev/null 2>&1 || true
 osascript -e 'tell application id "com.github.Skyearn.BLEUnlock" to quit' >/dev/null 2>&1 || true
 
@@ -119,6 +126,9 @@ else
   sudo rm -rf "${destination_app}"
   sudo ditto "${source_app}" "${destination_app}"
 fi
+
+codesign --verify --deep --strict --verbose=2 "${destination_app}" || \
+  die "installed BLEUnlock.app failed code-signature verification"
 
 printf 'Installed BLEUnlock %s to %s\n' "${RELEASE_TAG}" "${destination_app}"
 

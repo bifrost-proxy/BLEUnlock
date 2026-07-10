@@ -66,7 +66,7 @@ jobs:
           set -euo pipefail
 
           if [[ -z "${MACOS_CERT_P12_BASE64}" ]]; then
-            echo "No signing certificate configured; the release will be unsigned."
+            echo "No signing certificate configured; the release will use ad-hoc signing."
             exit 0
           fi
 
@@ -101,24 +101,18 @@ jobs:
       - name: Sign release app
         env:
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          MACOS_ENTITLEMENTS_PATH: BLEUnlock/BLEUnlock.entitlements
         shell: bash
         run: |
           set -euo pipefail
           APP_PATH="build/Build/Products/Release/BLEUnlock.app"
+          bash scripts/sign-macos-app.sh "${APP_PATH}"
 
-          if [[ -z "${MACOS_SIGNING_IDENTITY}" ]]; then
-            echo "No signing identity configured; leaving the release unsigned."
-            exit 0
+          if /usr/bin/codesign --display --verbose=4 "${APP_PATH}" 2>&1 | grep -q '^Signature=adhoc$'; then
+            echo "APP_SIGNING_MODE=adhoc" >> "${GITHUB_ENV}"
+          else
+            echo "APP_SIGNING_MODE=developer-id" >> "${GITHUB_ENV}"
           fi
-
-          /usr/bin/codesign \
-            --force \
-            --deep \
-            --options runtime \
-            --entitlements BLEUnlock/BLEUnlock.entitlements \
-            --sign "${MACOS_SIGNING_IDENTITY}" \
-            "${APP_PATH}"
-          /usr/bin/codesign --verify --deep --strict --verbose=2 "${APP_PATH}"
 
       - name: Verify app metadata
         shell: bash
@@ -159,6 +153,10 @@ jobs:
           cd "${DEST_DIR}"
           shasum -a 256 "$(basename "${DMG_PATH}")" > "$(basename "${DMG_PATH}").sha256"
 
+      - name: Verify packaged DMG
+        shell: bash
+        run: bash scripts/verify-macos-dmg.sh "build/Build/Products/Release/BLEUnlock-${RELEASE_TAG}.dmg"
+
       - name: Notarize DMG
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -174,6 +172,12 @@ jobs:
             exit 0
           fi
 
+          if [[ "${APP_SIGNING_MODE:-adhoc}" != "developer-id" ]]; then
+            echo "Notarization credentials are configured, but the app is only ad-hoc signed." >&2
+            echo "Configure a Developer ID Application certificate and MACOS_SIGNING_IDENTITY." >&2
+            exit 1
+          fi
+
           : "${APPLE_ID:?APPLE_ID is required for notarization}"
           : "${APPLE_TEAM_ID:?APPLE_TEAM_ID is required for notarization}"
           : "${APPLE_APP_PASSWORD:?APPLE_APP_PASSWORD is required for notarization}"
@@ -184,6 +188,9 @@ jobs:
             --password "${APPLE_APP_PASSWORD}" \
             --wait
           xcrun stapler staple "${DMG_PATH}"
+          xcrun stapler validate "${DMG_PATH}"
+          spctl --assess --type open --context context:primary-signature --verbose=4 "${DMG_PATH}"
+          bash scripts/verify-macos-dmg.sh "${DMG_PATH}"
 
           cd "$(dirname "${DMG_PATH}")"
           shasum -a 256 "$(basename "${DMG_PATH}")" > "$(basename "${DMG_PATH}").sha256"

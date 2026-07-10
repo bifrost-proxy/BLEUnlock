@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Sign nested executables before the outer app in CI, Test Build, and Release; automatically fall back to ad-hoc signing without Developer ID and re-verify the mounted app from the packaged DMG.
+- Verify the app code signature before and after script installation, and reject release artifacts with an unexpected bundle ID.
 - Keep device-list discovery advertisement-only: never connect to unbound peripherals or probe their GATT services, preventing unrelated system connection prompts from nearby glasses, headphones, and other devices.
 - Optimize steady-state background monitoring by separating device-list discovery from bound-device tracking, pausing full scans while active connections are healthy, and disabling high-frequency name diagnostics by default.
 - Add a repeatable background performance gate requiring average CPU below 10% and maximum resident memory below 80 MB.

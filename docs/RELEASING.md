@@ -14,7 +14,7 @@
 1. 在 `bifrost-proxy` 下创建公开仓库 `homebrew-tap`，默认分支为 `main`。
 2. 创建一个只能写入 `bifrost-proxy/homebrew-tap` Contents 的 fine-grained GitHub token。
 3. 在 `bifrost-proxy/BLEUnlock` 的 Actions secrets 中保存为 `TAP_PUSH_TOKEN`。
-4. 如需签名和公证，再配置以下 secrets：
+4. 如需 Developer ID 签名和公证，再配置以下 secrets：
    - `MACOS_CERT_P12_BASE64`
    - `MACOS_CERT_PASSWORD`
    - `KEYCHAIN_PASSWORD`
@@ -23,7 +23,7 @@
    - `APPLE_TEAM_ID`
    - `APPLE_APP_PASSWORD`
 
-没有签名相关 secrets 时仍可构建 Release，但产物不会经过 Developer ID 签名和 Apple 公证，首次打开可能被 Gatekeeper 拦截。`TAP_PUSH_TOKEN` 是正式发版的必需项；缺失时工作流会明确失败，不会把 Homebrew 未更新伪装成发版完成。
+没有签名相关 secrets 时仍可构建 Release，流水线会自动使用 ad-hoc 签名，并逐个签署内部 Mach-O、Launcher 和外层 App，再从 DMG 只读挂载后执行 `codesign --verify --deep --strict`。这可以避免未签名或签名不一致导致的“应用已损坏”，但 ad-hoc 签名不等于 Developer ID 信任，`spctl` 仍会拒绝它；要让 Homebrew 和普通下载用户稳定无拦截安装，必须配置 Developer ID 并完成 Apple 公证。`TAP_PUSH_TOKEN` 是正式发版的必需项；缺失时工作流会明确失败，不会把 Homebrew 未更新伪装成发版完成。
 
 ## 日常开发和上游同步
 
@@ -56,7 +56,9 @@ git push origin v1.15.0
 5. `.github/workflows/release.yml` 自动执行：
    - 校验 tag 格式和 Changelog；
    - 将 tag 版本写入 App，构建并检查 Bundle ID；
-   - 在配置证书时签名、公证；
+   - 始终签名并校验 App：有证书时使用 Developer ID，否则使用 ad-hoc；
+   - 从生成的 DMG 只读挂载 App，再次校验所有 Mach-O 和 Bundle ID；
+   - 在配置 Developer ID 与公证凭据时提交公证、staple 并执行 Gatekeeper 验收；
    - 生成 `BLEUnlock-vX.Y.Z.dmg` 和 `.sha256`；
    - 创建或更新 `bifrost-proxy/BLEUnlock` GitHub Release；
    - 更新 `bifrost-proxy/homebrew-tap` 的 `Casks/unlock.rb`。

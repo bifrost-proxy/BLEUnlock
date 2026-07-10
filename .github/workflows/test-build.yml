@@ -18,7 +18,7 @@ jobs:
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
           if [ -z "${MACOS_CERT_P12_BASE64}" ]; then
-            echo "MACOS_CERT_P12_BASE64 is not set. Skipping code signing."
+            echo "MACOS_CERT_P12_BASE64 is not set. The app will use ad-hoc signing."
             exit 0
           fi
 
@@ -54,15 +54,10 @@ jobs:
       - name: Code Sign App
         env:
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          MACOS_ENTITLEMENTS_PATH: BLEUnlock/BLEUnlock.entitlements
         run: |
-          if [ -z "${MACOS_SIGNING_IDENTITY}" ]; then
-            echo "MACOS_SIGNING_IDENTITY is not set. Skipping code signing."
-            exit 0
-          fi
-
           APP_PATH="build/Build/Products/Release/BLEUnlock.app"
-          ENTITLEMENTS_PATH="BLEUnlock/BLEUnlock.entitlements"
-          /usr/bin/codesign --force --deep --options runtime --entitlements "${ENTITLEMENTS_PATH}" --sign "${MACOS_SIGNING_IDENTITY}" "${APP_PATH}"
+          bash scripts/sign-macos-app.sh "${APP_PATH}"
 
       - name: Package DMG
         run: |
@@ -75,6 +70,9 @@ jobs:
             --no-version-in-filename \
             "${APP_PATH}" \
             "${DEST_DIR}"
+
+      - name: Verify packaged DMG
+        run: bash scripts/verify-macos-dmg.sh build/Build/Products/Release/BLEUnlock.dmg
 
       - name: Upload DMG
         uses: actions/upload-artifact@v4

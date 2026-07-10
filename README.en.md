@@ -64,13 +64,13 @@ brew install --cask bifrost-proxy/tap/unlock
 curl -fsSL https://raw.githubusercontent.com/bifrost-proxy/BLEUnlock/master/install.sh | bash
 ```
 
-The script downloads the latest DMG and checksum from this repository, verifies the checksum, and replaces `/Applications/BLEUnlock.app`.
+The script downloads the latest DMG and checksum from this repository, verifies SHA-256, app signature integrity, and the bundle ID, replaces `/Applications/BLEUnlock.app`, and verifies the installed signature again.
 
 ### Manual installation
 
 Download the dmg file from [Releases](https://github.com/bifrost-proxy/BLEUnlock/releases), open it, and move BLEUnlock to the Applications folder.
 
-> NOTE: This fork is not enrolled in the Apple Developer Program, so release builds cannot be distributed with Apple Developer ID signing and notarization. macOS may therefore block the app on first launch.
+> The release pipeline always verifies bundle signature integrity. It uses Developer ID signing and notarization when configured, otherwise it falls back to ad-hoc signing so nested executables cannot leave the bundle with missing or inconsistent signatures. Ad-hoc signing does not establish developer trust, so macOS may still block the first launch; right-click the app in Finder and choose **Open**.
 >
 > When double-clicking for the first time, macOS shows "cannot be opened because Apple cannot check it for malicious software" with only "Done" and "Move to Trash":
 > 1. Move `BLEUnlock.app` to `/Applications`.
