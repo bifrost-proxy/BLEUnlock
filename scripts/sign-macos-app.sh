@@ -36,10 +36,14 @@ is_macho() {
   file -b "$1" | grep -q 'Mach-O'
 }
 
-# Sign every nested Mach-O first. This covers the Launcher executable and any
-# Swift runtime dylibs embedded by Xcode without relying on codesign --deep to
-# discover signing order implicitly.
+# Sign standalone nested Mach-O files first. Bundle main executables under
+# Contents/MacOS are signed with their containing bundle below; asking codesign
+# to sign one directly can make it validate the outer bundle before nested apps
+# have been signed, making the result depend on find's traversal order.
 while IFS= read -r -d '' candidate; do
+  if [[ "${candidate}" == */Contents/MacOS/* ]]; then
+    continue
+  fi
   if is_macho "${candidate}"; then
     /usr/bin/codesign "${sign_args[@]}" "${candidate}"
   fi
