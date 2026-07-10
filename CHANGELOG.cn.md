@@ -1,5 +1,11 @@
 # 发布说明
 
+## 未发布
+
+- 将 GitHub Release、更新检查、Homebrew 发布和安装文档统一迁移到 `bifrost-proxy`。
+- 将主 App 和 Launcher 的 Bundle ID 改为 `com.bifrost-proxy.BLEUnlock`，并兼容迁移旧 ID 下的偏好设置、钥匙串、登录项和 event 脚本。
+- 新增带 SHA-256 校验的安装脚本，并以 `bifrost-proxy/tap/unlock` 发布 Homebrew Cask。
+
 
 ## 1.14.3
 

@@ -8,10 +8,10 @@ func t(_ key: String) -> String {
     return NSLocalizedString(key, comment: "")
 }
 
-private let currentAppBundleIdentifier = "com.github.Skyearn.BLEUnlock"
-private let legacyMainBundleIdentifiers = ["jp.sone.BLEUnlock"]
-private let lockNotificationID = "com.github.Skyearn.BLEUnlock.lock"
-private let updateNotificationID = "com.github.Skyearn.BLEUnlock.update"
+private let currentAppBundleIdentifier = "com.bifrost-proxy.BLEUnlock"
+private let legacyMainBundleIdentifiers = ["com.github.Skyearn.BLEUnlock", "jp.sone.BLEUnlock"]
+private let lockNotificationID = "com.bifrost-proxy.BLEUnlock.lock"
+private let updateNotificationID = "com.bifrost-proxy.BLEUnlock.update"
 private let notificationKindKey = "kind"
 private let launcherBundleIDSuffix = ".Launcher"
 private let unlockLogicMenuItemKind = "unlockLogic"
@@ -167,7 +167,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     var lockNowMenuItem: NSMenuItem?
     var deviceMenuItem: NSMenuItem?
     /// Serial queue for ServiceManagement XPC calls to avoid concurrent smd requests.
-    let smdQueue = DispatchQueue(label: "com.github.Skyearn.BLEUnlock.smd")
+    let smdQueue = DispatchQueue(label: "com.bifrost-proxy.BLEUnlock.smd")
     let prefs = UserDefaults.standard
     var displaySleep = false
     var systemSleep = false
@@ -188,7 +188,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     var flagsEventMonitor: Any?
     var deviceMaxTitleWidth: [UUID: CGFloat] = [:]
     var automationPermissionPromptedApps: Set<ManagedMediaApp> = []
-    let mediaControlQueue = DispatchQueue(label: "com.github.Skyearn.BLEUnlock.media-control", qos: .userInitiated)
+    let mediaControlQueue = DispatchQueue(label: "com.bifrost-proxy.BLEUnlock.media-control", qos: .userInitiated)
     var systemWakeTimer: Timer?
     var wakeUnlockTimer: Timer?
     var postUnlockRetryTimer: Timer?
@@ -1162,7 +1162,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     func userNotificationCenter(_ center: NSUserNotificationCenter,
                                 didActivate notification: NSUserNotification) {
         if notification != userNotification {
-            NSWorkspace.shared.open(URL(string: "https://github.com/Skyearn/BLEUnlock/releases")!)
+            NSWorkspace.shared.open(URL(string: "https://github.com/bifrost-proxy/BLEUnlock/releases")!)
             NSUserNotificationCenter.default.removeDeliveredNotification(notification)
         }
     }
@@ -1193,7 +1193,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
         let kind = response.notification.request.content.userInfo[notificationKindKey] as? String
         if kind == AppNotificationKind.update.rawValue {
-            NSWorkspace.shared.open(URL(string: "https://github.com/Skyearn/BLEUnlock/releases")!)
+            NSWorkspace.shared.open(URL(string: "https://github.com/bifrost-proxy/BLEUnlock/releases")!)
             removeDeliveredNotification(identifier: updateNotificationID)
         }
         completionHandler()
@@ -1922,6 +1922,33 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         prefs.set(true, forKey: legacyBundleIDMigrationKey)
     }
 
+    func migrateLegacyApplicationScriptsIfNeeded() {
+        let fileManager = FileManager.default
+        let scriptsRoot = fileManager.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Scripts", isDirectory: true)
+        let currentDirectory = scriptsRoot
+            .appendingPathComponent(currentAppBundleIdentifier, isDirectory: true)
+        let currentEvent = currentDirectory.appendingPathComponent("event")
+
+        guard !fileManager.fileExists(atPath: currentEvent.path) else { return }
+
+        for legacyBundleIdentifier in legacyMainBundleIdentifiers {
+            let legacyEvent = scriptsRoot
+                .appendingPathComponent(legacyBundleIdentifier, isDirectory: true)
+                .appendingPathComponent("event")
+            guard fileManager.fileExists(atPath: legacyEvent.path) else { continue }
+
+            do {
+                try fileManager.createDirectory(at: currentDirectory,
+                                                withIntermediateDirectories: true)
+                try fileManager.copyItem(at: legacyEvent, to: currentEvent)
+            } catch {
+                print("Failed to migrate legacy event script: \(error.localizedDescription)")
+            }
+            return
+        }
+    }
+
     func legacyLauncherBundleIdentifiers() -> [String] {
         legacyMainBundleIdentifiers.map { $0 + launcherBundleIDSuffix }
     }
@@ -1938,6 +1965,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
 
     func migrateLegacyAppDataIfNeeded() {
         migrateLegacyDefaultsIfNeeded()
+        migrateLegacyApplicationScriptsIfNeeded()
     }
     
     @objc func askPassword() {
@@ -2419,7 +2447,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     }
 
     // Clean up ALL legacy login items: old SMLoginItemSetEnabled entries
-    // (both current and jp.sone bundle IDs) and old SMAppService.loginItem
+    // (both previous bundle IDs and the current helper ID) and old SMAppService.loginItem
     // registrations that used the Launcher helper instead of mainApp.
     func cleanupAllLegacyLoginItems() {
         let allLauncherIDs = legacyLauncherBundleIdentifiers() + [launcherBundleIdentifier()]

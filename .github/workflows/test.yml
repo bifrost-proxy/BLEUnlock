@@ -6,6 +6,9 @@ on:
       - master
     tags-ignore:
       - "*"
+  pull_request:
+    branches:
+      - master
 
 jobs:
   build:
@@ -13,6 +16,10 @@ jobs:
     runs-on: macOS-latest
     
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v6
+    - name: Validate installer
+      run: |
+        bash -n install.sh
+        bash install.sh --help
     - name: Start xcodebuild test
       run: xcodebuild clean build -project BLEUnlock.xcodeproj -scheme BLEUnlock CODE_SIGNING_ALLOWED=NO

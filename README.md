@@ -2,12 +2,12 @@
 
 ## Please note that I don't distribute this app on the Mac App Store. You can find it here for free! 
 
-![CI](https://github.com/Skyearn/BLEUnlock/workflows/CI/badge.svg)
-![Github All Releases](https://img.shields.io/github/downloads/Skyearn/BLEUnlock/total.svg)
+![CI](https://github.com/bifrost-proxy/BLEUnlock/actions/workflows/test.yml/badge.svg)
+![Github All Releases](https://img.shields.io/github/downloads/bifrost-proxy/BLEUnlock/total.svg)
 
 BLEUnlock is a small menu bar utility that locks and unlocks your Mac by proximity of your iPhone, Apple Watch, or any other Bluetooth Low Energy device.
 
-This document is also available in [Japanese (日本語版はこちら)](README.ja.md) and [Simplified Chinese (简体中文)](README.cn.md).
+This document is also available in [Simplified Chinese (简体中文)](README.cn.md).
 
 > This repository is a fork of the original [ts1/BLEUnlock](https://github.com/ts1/BLEUnlock), created by Takeshi Sone. Many thanks to Takeshi Sone for open-sourcing BLEUnlock under the MIT license, and to all contributors who made the original project possible.
 
@@ -51,14 +51,22 @@ For users who need both security and convenience, consider using Apple's built-i
 ### Using Homebrew Cask
 
 ```sh
-brew install --cask Skyearn/tap/bleunlock
+brew install --cask bifrost-proxy/tap/unlock
 ```
 
-> This uses this fork's own Homebrew tap. The official `bleunlock` cask in Homebrew may still point to the upstream project.
+> Homebrew uses `owner/tap/cask` names. The npm-style name `@bifrost-proxy/unlock` is not valid Homebrew syntax.
+
+### Using the installation script
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/bifrost-proxy/BLEUnlock/master/install.sh | bash
+```
+
+The script downloads the latest DMG and checksum from this repository, verifies the checksum, and replaces `/Applications/BLEUnlock.app`.
 
 ### Manual installation
 
-Download the dmg file from [Releases](https://github.com/Skyearn/BLEUnlock/releases), open it, and move BLEUnlock to the Applications folder.
+Download the dmg file from [Releases](https://github.com/bifrost-proxy/BLEUnlock/releases), open it, and move BLEUnlock to the Applications folder.
 
 > NOTE: This fork is not enrolled in the Apple Developer Program, so release builds cannot be distributed with Apple Developer ID signing and notarization. macOS may therefore block the app on first launch.
 >
@@ -180,7 +188,7 @@ Pairing itself usually has little effect on battery life. The bigger battery imp
 On locking and unlocking, BLEUnlock runs a script located here:
 
 ```
-~/Library/Application Scripts/com.github.Skyearn.BLEUnlock/event
+~/Library/Application Scripts/com.bifrost-proxy.BLEUnlock/event
 ```
 
 An argument is passed depending on the type of event:
@@ -249,7 +257,7 @@ Giving permission to this app resolves the problem.
 
 ## Fork Origin
 
-This fork is based on the original [ts1/BLEUnlock](https://github.com/ts1/BLEUnlock) by Takeshi Sone and continues development in this repository for its own releases and changes.
+This Bifrost Proxy fork is based on the original [ts1/BLEUnlock](https://github.com/ts1/BLEUnlock) by Takeshi Sone and continues development in this repository for its own releases and changes.
 
 Thank you to Takeshi Sone for the original project, and to everyone who contributed fixes, translations, and ideas over time.
 
