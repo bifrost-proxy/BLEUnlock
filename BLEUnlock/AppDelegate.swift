@@ -146,7 +146,9 @@ func notifyUpdateAvailable() {
     }
 }
 
+#if !BLEUNLOCK_LOCAL_MAIN
 @NSApplicationMain
+#endif
 class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemValidation, NSUserNotificationCenterDelegate, UNUserNotificationCenterDelegate, BLEDelegate {
     let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     let ble = BLE()
@@ -206,6 +208,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     let screensaverEscapeRetryDelay = 0.35
     let wakeUnlockRetryDelay = 0.5
     let wakeUnlockMaxRetries = 8
+
+    @discardableResult
+    func hideDockIcon(reason: String) -> Bool {
+        let changed = NSApp.setActivationPolicy(.accessory)
+        NSLog("Dock policy accessory (%@): changed=%d, current=%d",
+              reason, changed, NSApp.activationPolicy().rawValue)
+        return changed
+    }
+
+    func applyPresentationMode(reason: String) {
+        hideDockIcon(reason: reason)
+        let hidesMenuBarIcon = prefs.bool(forKey: runInBackgroundKey)
+        statusItem.isVisible = !hidesMenuBarIcon
+        if hidesMenuBarIcon {
+            ble.stopScanning()
+        }
+    }
 
     func menuWillOpen(_ menu: NSMenu) {
         if menu == deviceMenu {
@@ -1719,7 +1738,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         // The app temporarily becomes regular while the display is asleep so
         // CoreBluetooth can recover. Hide the Dock icon immediately on wake;
         // the delayed block is only for Bluetooth and unlock recovery.
-        NSApp.setActivationPolicy(.accessory)
+        hideDockIcon(reason: "system wake")
         systemWakeTimer?.invalidate()
         systemWakeTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: false, block: { [weak self] _ in
             guard let self = self else { return }
@@ -2563,14 +2582,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     func applicationWillFinishLaunching(_ notification: Notification) {
         // Switch before menus, Bluetooth, permissions, and login-item work so
         // BLEUnlock never flashes a Dock icon during startup.
-        NSApp.setActivationPolicy(.accessory)
+        hideDockIcon(reason: "will finish launching")
     }
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         // AppKit may restore the regular activation policy between the
         // will-finish and did-finish callbacks. Re-apply it before any
         // potentially slow Bluetooth, permission, or login-item setup.
-        NSApp.setActivationPolicy(.accessory)
+        hideDockIcon(reason: "did finish launching start")
         migrateLegacyAppDataIfNeeded()
         // Clean up all legacy login items and sync pref with actual registration state.
         smdQueue.async { [weak self] in
@@ -2680,10 +2699,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         // Hide dock icon.
         // This is required because we can't have LSUIElement set to true in Info.plist,
         // otherwise CBCentralManager.scanForPeripherals won't work.
-        NSApp.setActivationPolicy(.accessory)
+        applyPresentationMode(reason: "did finish launching end")
+        // LaunchServices/AppKit can restore activation and status-item state
+        // after the delegate callback. Re-apply the final presentation on the
+        // next main-loop turn so hidden background mode remains authoritative.
+        DispatchQueue.main.async { [weak self] in
+            self?.applyPresentationMode(reason: "post-launch state restoration")
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.applyPresentationMode(reason: "delayed post-launch state restoration")
+        }
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
+        applyPresentationMode(reason: "did become active")
         refreshPermissionRecovery()
     }
 

@@ -108,6 +108,7 @@ xcrun --sdk macosx swiftc \
   -sdk "${SDKROOT}" \
   -Onone \
   -g \
+  -D BLEUNLOCK_LOCAL_MAIN \
   -module-name BLEUnlock \
   -import-objc-header "${ROOT_DIR}/BLEUnlock/BLEUnlock-Bridging-Header.h" \
   "${ROOT_DIR}/BLEUnlock/AppDelegate.swift" \
@@ -116,6 +117,7 @@ xcrun --sdk macosx swiftc \
   "${ROOT_DIR}/BLEUnlock/appleDeviceNames.swift" \
   "${ROOT_DIR}/BLEUnlock/checkUpdate.swift" \
   "${ROOT_DIR}/BLEUnlock/AboutBox.swift" \
+  "${ROOT_DIR}/scripts/LocalMain.swift" \
   "${OBJECT_DIR}/lowlevel.o" \
   -F "${SDKROOT}/System/Library/PrivateFrameworks" \
   -framework Cocoa \
