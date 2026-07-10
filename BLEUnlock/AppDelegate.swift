@@ -1716,12 +1716,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
 
     @objc func onSystemWake() {
         print("system wake")
+        // The app temporarily becomes regular while the display is asleep so
+        // CoreBluetooth can recover. Hide the Dock icon immediately on wake;
+        // the delayed block is only for Bluetooth and unlock recovery.
+        NSApp.setActivationPolicy(.accessory)
         systemWakeTimer?.invalidate()
         systemWakeTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: false, block: { [weak self] _ in
             guard let self = self else { return }
             self.systemWakeTimer = nil
             print("delayed system wake job")
-            NSApp.setActivationPolicy(.accessory) // Hide Dock icon again
             self.systemSleep = false
             self.ble.resumeMonitoringAfterSystemWake()
             self.lastWakeAt = Date().timeIntervalSince1970
@@ -2557,7 +2560,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         return ok
     }
 
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // Switch before menus, Bluetooth, permissions, and login-item work so
+        // BLEUnlock never flashes a Dock icon during startup.
+        NSApp.setActivationPolicy(.accessory)
+    }
+
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+        // AppKit may restore the regular activation policy between the
+        // will-finish and did-finish callbacks. Re-apply it before any
+        // potentially slow Bluetooth, permission, or login-item setup.
+        NSApp.setActivationPolicy(.accessory)
         migrateLegacyAppDataIfNeeded()
         // Clean up all legacy login items and sync pref with actual registration state.
         smdQueue.async { [weak self] in
