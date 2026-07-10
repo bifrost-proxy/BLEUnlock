@@ -161,6 +161,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     var checkForUpdatesMenuItem: NSMenuItem?
     var automaticUpdateChecksMenuItem: NSMenuItem?
     var runInBackgroundMenuItem: NSMenuItem?
+    var menuConstructed = false
     var deviceDict: [UUID: NSMenuItem] = [:]
     var deviceInsertionOrder: [UUID] = []
     var deviceCheckboxDict: [UUID: NSButton] = [:]
@@ -492,6 +493,33 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     /// Layout: hint(0) + fixed-sep(1) + monitored devices + group-sep + "Scanning…" + unmonitored devices.
     /// Uses a diff-based approach: only removes stale items and inserts missing ones,
     /// avoiding the wholesale remove+rebuild that can crash NSMenu internals.
+    func deviceComesBeforeBySignal(_ lhs: UUID, _ rhs: UUID) -> Bool {
+        let lhsRSSI = displayedRSSI(for: lhs)
+        let rhsRSSI = displayedRSSI(for: rhs)
+
+        switch (lhsRSSI, rhsRSSI) {
+        case let (left?, right?):
+            if left.magnitude != right.magnitude {
+                return left.magnitude < right.magnitude
+            }
+        case (_?, nil):
+            return true
+        case (nil, _?):
+            return false
+        case (nil, nil):
+            break
+        }
+
+        // Keep equal or missing signals stable so the menu does not flicker.
+        let lhsKey = ble.devices[lhs]?.macAddr ?? lhs.uuidString
+        let rhsKey = ble.devices[rhs]?.macAddr ?? rhs.uuidString
+        let comparison = lhsKey.localizedStandardCompare(rhsKey)
+        if comparison != .orderedSame {
+            return comparison == .orderedAscending
+        }
+        return lhs.uuidString < rhs.uuidString
+    }
+
     func performDeviceMenuReorder() {
         guard !deviceMenuIsOpen else {
             updateGroupSeparatorVisibility()
@@ -503,15 +531,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
             guard let item = deviceDict[uuid] else { return nil }
             return (uuid, item)
         }
-        // Monitored sorted by stable key (MAC > UUID) to prevent reordering as names resolve
+        // Keep monitored devices in their own group, strongest signal first.
         let monitoredFirst = snapshot
             .filter { monitoredSet.contains($0.0) }
-            .sorted {
-                let keyA = ble.devices[$0.0]?.macAddr ?? $0.0.uuidString
-                let keyB = ble.devices[$1.0]?.macAddr ?? $1.0.uuidString
-                return keyA.localizedStandardCompare(keyB) == .orderedAscending
-            }
-        let unmonitoredAfter = snapshot.filter { !monitoredSet.contains($0.0) }
+            .sorted { deviceComesBeforeBySignal($0.0, $1.0) }
+        let unmonitoredAfter = snapshot
+            .filter { !monitoredSet.contains($0.0) }
+            .sorted { deviceComesBeforeBySignal($0.0, $1.0) }
         let wantsSeparator = !monitoredFirst.isEmpty && !unmonitoredAfter.isEmpty
 
         // Build desired items list (flat)
@@ -1120,19 +1146,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     }
 
     func updateRSSI(rssi: Int?, active: Bool) {
+        let wasConnected = connected
         if let r = rssi {
             lastRSSI = r
-            updateMonitorStatusItems()
-            if (!connected) {
-                connected = true
-                statusItem.button?.image = NSImage(named: "StatusBarConnected")
-            }
-        } else {
-            updateMonitorStatusItems()
-            if (connected) {
-                connected = false
-                statusItem.button?.image = NSImage(named: "StatusBarDisconnected")
-            }
+        }
+        connected = rssi != nil
+        guard statusItem.isVisible else { return }
+
+        updateMonitorStatusItems()
+        if connected != wasConnected {
+            statusItem.button?.image = NSImage(
+                named: connected ? "StatusBarConnected" : "StatusBarDisconnected"
+            )
         }
     }
 
@@ -1774,10 +1799,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         connected = false
         statusItem.button?.image = NSImage(named: "StatusBarDisconnected")
         ble.startMonitor(uuids: uuids)
-        refreshDeviceMenuSelectionStates()
-        refreshSettingsMenus()
-        refreshMonitorStatusItems()
-        performDeviceMenuReorder()
+        if menuConstructed && statusItem.isVisible {
+            refreshDeviceMenuSelectionStates()
+            refreshSettingsMenus()
+            refreshMonitorStatusItems()
+            performDeviceMenuReorder()
+        }
     }
 
     func errorModal(_ msg: String, info: String? = nil) {
@@ -2083,6 +2110,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         prefs.set(shouldRunInBackground, forKey: runInBackgroundKey)
         menuItem.state = shouldRunInBackground ? .on : .off
         if shouldRunInBackground {
+            ble.stopScanning()
             DispatchQueue.main.async { [weak self] in
                 self?.statusItem.isVisible = false
             }
@@ -2282,6 +2310,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     }
     
     func constructMenu() {
+        guard !menuConstructed else { return }
+        menuConstructed = true
         monitorMenuItem = mainMenu.addItem(withTitle: t("device_not_set"), action: nil, keyEquivalent: "")
         
         var item: NSMenuItem
@@ -2544,7 +2574,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
 
         if let button = statusItem.button {
             button.image = NSImage(named: "StatusBarDisconnected")
-            constructMenu()
+            if !prefs.bool(forKey: runInBackgroundKey) {
+                constructMenu()
+            }
         }
         statusItem.isVisible = !prefs.bool(forKey: runInBackgroundKey)
         ble.delegate = self
@@ -2641,8 +2673,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if prefs.bool(forKey: runInBackgroundKey) || !statusItem.isVisible {
             prefs.set(false, forKey: runInBackgroundKey)
+            constructMenu()
             runInBackgroundMenuItem?.state = .off
             statusItem.isVisible = true
+            statusItem.button?.image = NSImage(named: connected ? "StatusBarConnected" : "StatusBarDisconnected")
+            updateMonitorStatusItems()
         }
         return false
     }

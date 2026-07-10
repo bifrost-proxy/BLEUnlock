@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Optimize steady-state background monitoring by separating device-list discovery from bound-device tracking, pausing full scans while active connections are healthy, disabling high-frequency name diagnostics by default, and lazily building hidden menu UI.
+- Add a repeatable background performance gate requiring average CPU below 10% and maximum resident memory below 80 MB.
+- Sort monitored and unmonitored device groups by ascending absolute RSSI, placing the strongest signals first and devices without a signal last.
 - Add a background-running option that hides the menu bar icon while keeping proximity monitoring active; reopening BLEUnlock restores the icon and disables the option.
 - Move GitHub Releases, update checks, Homebrew publishing, and installation documentation to `bifrost-proxy`.
 - Change the app and Launcher bundle identifiers to `com.bifrost-proxy.BLEUnlock`, with migration support for preferences, Keychain data, login items, and event scripts from previous identifiers.

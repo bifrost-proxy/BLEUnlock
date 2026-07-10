@@ -21,6 +21,7 @@ This document is also available in [Simplified Chinese (简体中文)](README.md
 - Optionally wakes from display sleep
 - Optionally pauses and unpauses music/video playback when you're away and back
 - Password is securely stored in Keychain
+- Devices are ordered by ascending absolute RSSI, so the strongest signals appear first
 - Devices with resolved MAC addresses appear in black; unresolved devices appear in gray, for at-a-glance distinction.
 - Hold ⌥ (Option) in the device list to reveal full MAC address and UUID. Release and reopen for compact display.
 
@@ -118,6 +119,10 @@ Passive Mode | By default it actively tries to connect to the BLE device and rea
 Launch at Login | Launches BLEUnlock when you login.
 Run in Background (Hide Menu Bar Icon) | Hides the menu bar icon while BLEUnlock keeps scanning and performing automatic lock/unlock actions. To restore the icon, open BLEUnlock again from Applications; this also turns off background hiding.
 Set Minimum RSSI | Devices with RSSI below this value will not be displayed in the device scan list.
+
+### Background Performance
+
+With at least one bound device and background mode enabled, BLEUnlock targets average CPU below 10% and maximum resident memory below 80 MB in steady state. Developers can run `scripts/profile-background.sh <PID> 60` for a 60-second sample; the script fails if either limit is exceeded.
 
 ## Troubleshooting
 

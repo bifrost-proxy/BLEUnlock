@@ -88,6 +88,15 @@ curl -fsSL https://raw.githubusercontent.com/bifrost-proxy/BLEUnlock/master/inst
 - 旧版升级时，设置、钥匙串密码和 event 脚本按预期迁移；
 - 用户知道新 Bundle ID 会触发蓝牙、辅助功能、通知等权限重新授权。
 
+绑定至少一台设备并启用后台运行后，再执行 60 秒性能门禁：
+
+```sh
+source ~/.zshrc
+scripts/profile-background.sh "$(pgrep -x BLEUnlock | head -1)" 60
+```
+
+必须同时满足平均 CPU 低于 10%、最大常驻内存低于 80 MB，才可继续发布。
+
 ## 用户安装命令
 
 Homebrew 不支持 npm 的 scope 语法，因此不能使用 `brew install @bifrost-proxy/unlock`。对外固定使用：

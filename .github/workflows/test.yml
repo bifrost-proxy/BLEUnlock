@@ -21,5 +21,7 @@ jobs:
       run: |
         bash -n install.sh
         bash install.sh --help
+        bash -n scripts/build-local.sh
+        bash -n scripts/profile-background.sh
     - name: Start xcodebuild test
       run: xcodebuild clean build -project BLEUnlock.xcodeproj -scheme BLEUnlock CODE_SIGNING_ALLOWED=NO
