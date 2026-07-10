@@ -146,7 +146,9 @@ func notifyUpdateAvailable() {
     }
 }
 
+#if !BLEUNLOCK_LOCAL_MAIN
 @NSApplicationMain
+#endif
 class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemValidation, NSUserNotificationCenterDelegate, UNUserNotificationCenterDelegate, BLEDelegate {
     let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     let ble = BLE()
@@ -161,6 +163,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     var checkForUpdatesMenuItem: NSMenuItem?
     var automaticUpdateChecksMenuItem: NSMenuItem?
     var runInBackgroundMenuItem: NSMenuItem?
+    var menuConstructed = false
     var deviceDict: [UUID: NSMenuItem] = [:]
     var deviceInsertionOrder: [UUID] = []
     var deviceCheckboxDict: [UUID: NSButton] = [:]
@@ -205,6 +208,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     let screensaverEscapeRetryDelay = 0.35
     let wakeUnlockRetryDelay = 0.5
     let wakeUnlockMaxRetries = 8
+
+    @discardableResult
+    func hideDockIcon(reason: String) -> Bool {
+        let changed = NSApp.setActivationPolicy(.accessory)
+        NSLog("Dock policy accessory (%@): changed=%d, current=%d",
+              reason, changed, NSApp.activationPolicy().rawValue)
+        return changed
+    }
+
+    func applyPresentationMode(reason: String) {
+        hideDockIcon(reason: reason)
+        let hidesMenuBarIcon = prefs.bool(forKey: runInBackgroundKey)
+        statusItem.isVisible = !hidesMenuBarIcon
+        if hidesMenuBarIcon {
+            ble.stopScanning()
+        }
+    }
 
     func menuWillOpen(_ menu: NSMenu) {
         if menu == deviceMenu {
@@ -492,6 +512,33 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     /// Layout: hint(0) + fixed-sep(1) + monitored devices + group-sep + "Scanning…" + unmonitored devices.
     /// Uses a diff-based approach: only removes stale items and inserts missing ones,
     /// avoiding the wholesale remove+rebuild that can crash NSMenu internals.
+    func deviceComesBeforeBySignal(_ lhs: UUID, _ rhs: UUID) -> Bool {
+        let lhsRSSI = displayedRSSI(for: lhs)
+        let rhsRSSI = displayedRSSI(for: rhs)
+
+        switch (lhsRSSI, rhsRSSI) {
+        case let (left?, right?):
+            if left.magnitude != right.magnitude {
+                return left.magnitude < right.magnitude
+            }
+        case (_?, nil):
+            return true
+        case (nil, _?):
+            return false
+        case (nil, nil):
+            break
+        }
+
+        // Keep equal or missing signals stable so the menu does not flicker.
+        let lhsKey = ble.devices[lhs]?.macAddr ?? lhs.uuidString
+        let rhsKey = ble.devices[rhs]?.macAddr ?? rhs.uuidString
+        let comparison = lhsKey.localizedStandardCompare(rhsKey)
+        if comparison != .orderedSame {
+            return comparison == .orderedAscending
+        }
+        return lhs.uuidString < rhs.uuidString
+    }
+
     func performDeviceMenuReorder() {
         guard !deviceMenuIsOpen else {
             updateGroupSeparatorVisibility()
@@ -503,15 +550,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
             guard let item = deviceDict[uuid] else { return nil }
             return (uuid, item)
         }
-        // Monitored sorted by stable key (MAC > UUID) to prevent reordering as names resolve
+        // Keep monitored devices in their own group, strongest signal first.
         let monitoredFirst = snapshot
             .filter { monitoredSet.contains($0.0) }
-            .sorted {
-                let keyA = ble.devices[$0.0]?.macAddr ?? $0.0.uuidString
-                let keyB = ble.devices[$1.0]?.macAddr ?? $1.0.uuidString
-                return keyA.localizedStandardCompare(keyB) == .orderedAscending
-            }
-        let unmonitoredAfter = snapshot.filter { !monitoredSet.contains($0.0) }
+            .sorted { deviceComesBeforeBySignal($0.0, $1.0) }
+        let unmonitoredAfter = snapshot
+            .filter { !monitoredSet.contains($0.0) }
+            .sorted { deviceComesBeforeBySignal($0.0, $1.0) }
         let wantsSeparator = !monitoredFirst.isEmpty && !unmonitoredAfter.isEmpty
 
         // Build desired items list (flat)
@@ -1120,19 +1165,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     }
 
     func updateRSSI(rssi: Int?, active: Bool) {
+        let wasConnected = connected
         if let r = rssi {
             lastRSSI = r
-            updateMonitorStatusItems()
-            if (!connected) {
-                connected = true
-                statusItem.button?.image = NSImage(named: "StatusBarConnected")
-            }
-        } else {
-            updateMonitorStatusItems()
-            if (connected) {
-                connected = false
-                statusItem.button?.image = NSImage(named: "StatusBarDisconnected")
-            }
+        }
+        connected = rssi != nil
+        guard statusItem.isVisible else { return }
+
+        updateMonitorStatusItems()
+        if connected != wasConnected {
+            statusItem.button?.image = NSImage(
+                named: connected ? "StatusBarConnected" : "StatusBarDisconnected"
+            )
         }
     }
 
@@ -1691,12 +1735,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
 
     @objc func onSystemWake() {
         print("system wake")
+        // The app temporarily becomes regular while the display is asleep so
+        // CoreBluetooth can recover. Hide the Dock icon immediately on wake;
+        // the delayed block is only for Bluetooth and unlock recovery.
+        hideDockIcon(reason: "system wake")
         systemWakeTimer?.invalidate()
         systemWakeTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: false, block: { [weak self] _ in
             guard let self = self else { return }
             self.systemWakeTimer = nil
             print("delayed system wake job")
-            NSApp.setActivationPolicy(.accessory) // Hide Dock icon again
             self.systemSleep = false
             self.ble.resumeMonitoringAfterSystemWake()
             self.lastWakeAt = Date().timeIntervalSince1970
@@ -1774,10 +1821,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         connected = false
         statusItem.button?.image = NSImage(named: "StatusBarDisconnected")
         ble.startMonitor(uuids: uuids)
-        refreshDeviceMenuSelectionStates()
-        refreshSettingsMenus()
-        refreshMonitorStatusItems()
-        performDeviceMenuReorder()
+        if menuConstructed && statusItem.isVisible {
+            refreshDeviceMenuSelectionStates()
+            refreshSettingsMenus()
+            refreshMonitorStatusItems()
+            performDeviceMenuReorder()
+        }
     }
 
     func errorModal(_ msg: String, info: String? = nil) {
@@ -2083,6 +2132,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         prefs.set(shouldRunInBackground, forKey: runInBackgroundKey)
         menuItem.state = shouldRunInBackground ? .on : .off
         if shouldRunInBackground {
+            ble.stopScanning()
             DispatchQueue.main.async { [weak self] in
                 self?.statusItem.isVisible = false
             }
@@ -2282,6 +2332,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     }
     
     func constructMenu() {
+        guard !menuConstructed else { return }
         monitorMenuItem = mainMenu.addItem(withTitle: t("device_not_set"), action: nil, keyEquivalent: "")
         
         var item: NSMenuItem
@@ -2412,6 +2463,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         mainMenu.addItem(withTitle: t("about"), action: #selector(showAboutBox), keyEquivalent: "")
         mainMenu.addItem(NSMenuItem.separator())
         mainMenu.addItem(withTitle: t("quit"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
+        menuConstructed = true
         statusItem.menu = mainMenu
     }
 
@@ -2527,7 +2579,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         return ok
     }
 
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // Switch before menus, Bluetooth, permissions, and login-item work so
+        // BLEUnlock never flashes a Dock icon during startup.
+        hideDockIcon(reason: "will finish launching")
+    }
+
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+        // AppKit may restore the regular activation policy between the
+        // will-finish and did-finish callbacks. Re-apply it before any
+        // potentially slow Bluetooth, permission, or login-item setup.
+        hideDockIcon(reason: "did finish launching start")
         migrateLegacyAppDataIfNeeded()
         // Clean up all legacy login items and sync pref with actual registration state.
         smdQueue.async { [weak self] in
@@ -2544,7 +2606,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
 
         if let button = statusItem.button {
             button.image = NSImage(named: "StatusBarDisconnected")
-            constructMenu()
+            // Attach a menu object immediately, even during a hidden launch.
+            // AppKit then keeps the status item wired for clicks; the heavier
+            // menu item tree can still be built only when it becomes visible.
+            statusItem.menu = mainMenu
+            if !prefs.bool(forKey: runInBackgroundKey) {
+                constructMenu()
+            }
         }
         statusItem.isVisible = !prefs.bool(forKey: runInBackgroundKey)
         ble.delegate = self
@@ -2631,18 +2699,31 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         // Hide dock icon.
         // This is required because we can't have LSUIElement set to true in Info.plist,
         // otherwise CBCentralManager.scanForPeripherals won't work.
-        NSApp.setActivationPolicy(.accessory)
+        applyPresentationMode(reason: "did finish launching end")
+        // LaunchServices/AppKit can restore activation and status-item state
+        // after the delegate callback. Re-apply the final presentation on the
+        // next main-loop turn so hidden background mode remains authoritative.
+        DispatchQueue.main.async { [weak self] in
+            self?.applyPresentationMode(reason: "post-launch state restoration")
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.applyPresentationMode(reason: "delayed post-launch state restoration")
+        }
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
+        applyPresentationMode(reason: "did become active")
         refreshPermissionRecovery()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if prefs.bool(forKey: runInBackgroundKey) || !statusItem.isVisible {
             prefs.set(false, forKey: runInBackgroundKey)
+            constructMenu()
             runInBackgroundMenuItem?.state = .off
             statusItem.isVisible = true
+            statusItem.button?.image = NSImage(named: connected ? "StatusBarConnected" : "StatusBarDisconnected")
+            updateMonitorStatusItems()
         }
         return false
     }

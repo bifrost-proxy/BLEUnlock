@@ -9,7 +9,7 @@ BLEUnlock is a small menu bar utility that locks and unlocks your Mac by proximi
 
 This document is also available in [Simplified Chinese (简体中文)](README.md).
 
-> This repository is a fork of the original [ts1/BLEUnlock](https://github.com/ts1/BLEUnlock), created by Takeshi Sone. Many thanks to Takeshi Sone for open-sourcing BLEUnlock under the MIT license, and to all contributors who made the original project possible.
+> This repository is a fork of the original [ts1/BLEUnlock](https://github.com/ts1/BLEUnlock), created by Takeshi Sone. Many thanks to Takeshi Sone for open-sourcing BLEUnlock under the MIT license, and to the developers who contributed core features, CI, installation, and release capabilities.
 
 ## Features
 
@@ -21,6 +21,8 @@ This document is also available in [Simplified Chinese (简体中文)](README.md
 - Optionally wakes from display sleep
 - Optionally pauses and unpauses music/video playback when you're away and back
 - Password is securely stored in Keychain
+- Devices are ordered by ascending absolute RSSI, so the strongest signals appear first
+- Device-list scanning reads advertisements only and never connects to unbound peripherals
 - Devices with resolved MAC addresses appear in black; unresolved devices appear in gray, for at-a-glance distinction.
 - Hold ⌥ (Option) in the device list to reveal full MAC address and UUID. Release and reopen for compact display.
 
@@ -62,13 +64,13 @@ brew install --cask bifrost-proxy/tap/unlock
 curl -fsSL https://raw.githubusercontent.com/bifrost-proxy/BLEUnlock/master/install.sh | bash
 ```
 
-The script downloads the latest DMG and checksum from this repository, verifies the checksum, and replaces `/Applications/BLEUnlock.app`.
+The script downloads the latest DMG and checksum from this repository, verifies SHA-256, app signature integrity, and the bundle ID, replaces `/Applications/BLEUnlock.app`, and verifies the installed signature again.
 
 ### Manual installation
 
 Download the dmg file from [Releases](https://github.com/bifrost-proxy/BLEUnlock/releases), open it, and move BLEUnlock to the Applications folder.
 
-> NOTE: This fork is not enrolled in the Apple Developer Program, so release builds cannot be distributed with Apple Developer ID signing and notarization. macOS may therefore block the app on first launch.
+> The release pipeline always verifies bundle signature integrity. It uses Developer ID signing and notarization when configured, otherwise it falls back to ad-hoc signing so nested executables cannot leave the bundle with missing or inconsistent signatures. Ad-hoc signing does not establish developer trust, so macOS may still block the first launch; right-click the app in Finder and choose **Open**.
 >
 > When double-clicking for the first time, macOS shows "cannot be opened because Apple cannot check it for malicious software" with only "Done" and "Move to Trash":
 > 1. Move `BLEUnlock.app` to `/Applications`.
@@ -116,8 +118,12 @@ Turn Off Screen on Lock | Turn off the display immediately when locking.
 Set Password... | If you changed your login password, use this.
 Passive Mode | By default it actively tries to connect to the BLE device and read the RSSI. Most of the time, the default is recommended and works stably. However, if you are using other Bluetooth things like keyboard, mouse, track pad or most notably Bluetooth Personal Hotspot, the default mode may interfere with each other. 2.4GHz WiFi may interfere as well. If you are experiencing instability of Bluetooth, turn on Passive Mode.
 Launch at Login | Launches BLEUnlock when you login.
-Run in Background (Hide Menu Bar Icon) | Hides the menu bar icon while BLEUnlock keeps scanning and performing automatic lock/unlock actions. To restore the icon, open BLEUnlock again from Applications; this also turns off background hiding.
-Set Minimum RSSI | Devices with RSSI below this value will not be displayed in the device scan list.
+Run in Background (Hide Menu Bar Icon) | Hides the menu bar icon without showing a Dock icon while BLEUnlock keeps scanning and performing automatic lock/unlock actions. To restore the menu bar icon, open BLEUnlock again from Applications; this also turns off background hiding.
+Set Minimum RSSI | Devices with RSSI below this value will not be displayed in the device scan list. The default is `-60 dBm`.
+
+### Background Performance
+
+With at least one bound device and background mode enabled, BLEUnlock targets average CPU below 10% and maximum resident memory below 80 MB in steady state. Developers can run `scripts/profile-background.sh <PID> 60` for a 60-second sample; the script fails if either limit is exceeded.
 
 ## Troubleshooting
 
@@ -256,23 +262,30 @@ do shell script "/usr/local/bin/ffmpeg -f avfoundation -r 30 -i 0 -frames:v 1 -y
 This app is required because BLEUnlock does not have Camera permission.
 Giving permission to this app resolves the problem.
 
-## Fork Origin
+## Development and releases
+
+Changes are developed on feature branches and merged into `master` through pull requests. Before committing, run the local compile, launch, and DMG packaging gate:
+
+```sh
+source ~/.zshrc
+scripts/build-local.sh --verify
+```
+
+This command only requires macOS Command Line Tools. It uses an isolated bundle identifier to compile and briefly launch the app, verify its signature, create a DMG and SHA-256 checksum, and validate a read-only mount without triggering automatic locking or unlocking. Formal releases are still built with full Xcode in GitHub Actions.
+
+- See [agents.md](agents.md) for the complete development, testing, review, PR, and CI workflow.
+- See [docs/RELEASING.md](docs/RELEASING.md) for tag, GitHub Release, and Homebrew publishing procedures.
+- User documentation is maintained only in this English README and the [Simplified Chinese README](README.md). Keep both files synchronized when features, installation, or security guidance changes.
+
+## Project origin and technical credits
 
 This Bifrost Proxy fork is based on the original [ts1/BLEUnlock](https://github.com/ts1/BLEUnlock) by Takeshi Sone and continues development in this repository for its own releases and changes.
 
-Thank you to Takeshi Sone for the original project, and to everyone who contributed fixes, translations, and ideas over time.
-
-## Credits
-
 - [Takeshi Sone](https://github.com/ts1): Original BLEUnlock author and project foundation
-- [peiit](https://github.com/peiit): Chinese translation
 - [wenmin-wu](https://github.com/wenmin-wu): Minimum RSSI and moving average
 - [stephengroat](https://github.com/stephengroat): CI
 - [joeyhoer](https://github.com/joeyhoer): Homebrew Cask
-- [cyberclaus](https://github.com/cyberclaus): German, Swedish, Norwegian (Bokmål) and Danish localizations
-- [alonewolfx2](https://github.com/alonewolfx2): Turkish localization
 - [wernjie](https://github.com/wernjie): Wake without Unlocking
-- [tokfrans03](https://github.com/tokfrans03): Language fixes
 
 
 Icons are based on SVGs downloaded from materialdesignicons.com.

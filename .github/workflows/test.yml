@@ -21,5 +21,19 @@ jobs:
       run: |
         bash -n install.sh
         bash install.sh --help
+        bash -n scripts/build-local.sh
+        bash -n scripts/profile-background.sh
+        bash -n scripts/sign-macos-app.sh
+        bash -n scripts/verify-macos-dmg.sh
     - name: Start xcodebuild test
-      run: xcodebuild clean build -project BLEUnlock.xcodeproj -scheme BLEUnlock CODE_SIGNING_ALLOWED=NO
+      run: |
+        xcodebuild clean build \
+          -project BLEUnlock.xcodeproj \
+          -scheme BLEUnlock \
+          -derivedDataPath build-ci \
+          CODE_SIGNING_ALLOWED=NO
+    - name: Ad-hoc sign and verify CI app
+      env:
+        MACOS_SIGNING_IDENTITY: "-"
+        MACOS_ENTITLEMENTS_PATH: BLEUnlock/BLEUnlock.entitlements
+      run: bash scripts/sign-macos-app.sh build-ci/Build/Products/Debug/BLEUnlock.app

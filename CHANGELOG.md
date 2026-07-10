@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Sign nested executables before the outer app in CI, Test Build, and Release; automatically fall back to ad-hoc signing without Developer ID and re-verify the mounted app from the packaged DMG.
+- Verify the app code signature before and after script installation, and reject release artifacts with an unexpected bundle ID.
+- Keep device-list discovery advertisement-only: never connect to unbound peripherals or probe their GATT services, preventing unrelated system connection prompts from nearby glasses, headphones, and other devices.
+- Optimize steady-state background monitoring by separating device-list discovery from bound-device tracking, pausing full scans while active connections are healthy, and disabling high-frequency name diagnostics by default.
+- Add a repeatable background performance gate requiring average CPU below 10% and maximum resident memory below 80 MB.
+- Sort monitored and unmonitored device groups by ascending absolute RSSI, placing the strongest signals first and devices without a signal last.
+- Change the device-list minimum RSSI default to `-60 dBm` to reduce noise from weak nearby devices.
+- Enter accessory-app mode before initialization and immediately on wake to prevent a transient Dock icon.
 - Add a background-running option that hides the menu bar icon while keeping proximity monitoring active; reopening BLEUnlock restores the icon and disables the option.
 - Move GitHub Releases, update checks, Homebrew publishing, and installation documentation to `bifrost-proxy`.
 - Change the app and Launcher bundle identifiers to `com.bifrost-proxy.BLEUnlock`, with migration support for preferences, Keychain data, login items, and event scripts from previous identifiers.
