@@ -5,6 +5,7 @@
 "check_for_updates" = "检查更新…";
 "closer" = "⬆接近";
 "download_update" = "下载更新";
+"install_update" = "安装更新";
 "device" = "设备列表";
 "device_not_set" = "未选择设备";
 "disabled" = "禁用";
@@ -59,6 +60,8 @@
 "update_available_message" = "发现 BLEUnlock %1$@ 新版本。";
 "update_available_title" = "发现更新";
 "update_check_failed" = "检查更新失败";
+"update_install_failed" = "安装更新失败";
+"update_installing" = "正在安装更新…";
 "update_up_to_date" = "BLEUnlock 已是最新版本。";
 "updates" = "更新";
 "updates_available" = "更新（有新版本）";

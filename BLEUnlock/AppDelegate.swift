@@ -162,6 +162,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     var updateMenuItem: NSMenuItem?
     var checkForUpdatesMenuItem: NSMenuItem?
     var automaticUpdateChecksMenuItem: NSMenuItem?
+    var updateInstallationInProgress = false
     var runInBackgroundMenuItem: NSMenuItem?
     var menuConstructed = false
     var deviceDict: [UUID: NSMenuItem] = [:]
@@ -2210,18 +2211,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
                     alert.informativeText = String(format: t("update_available_message"), version)
                     alert.window.title = "BLEUnlock"
                     if downloadURL != nil {
-                        alert.addButton(withTitle: t("download_update"))
+                        alert.addButton(withTitle: t("install_update"))
                     }
                     alert.addButton(withTitle: t("open_releases"))
                     alert.addButton(withTitle: t("cancel"))
                     NSApp.activate(ignoringOtherApps: true)
                     let response = alert.runModal()
-                    if response == .alertFirstButtonReturn {
-                        if let downloadURL {
-                            NSWorkspace.shared.open(downloadURL)
-                        } else {
-                            NSWorkspace.shared.open(releaseURL)
-                        }
+                    if let downloadURL, response == .alertFirstButtonReturn {
+                        self.installUpdate(version: version, downloadURL: downloadURL)
+                    } else if downloadURL == nil && response == .alertFirstButtonReturn {
+                        NSWorkspace.shared.open(releaseURL)
                     } else if downloadURL != nil && response == .alertSecondButtonReturn {
                         NSWorkspace.shared.open(releaseURL)
                     }
@@ -2232,6 +2231,25 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
                 case .failure(let message):
                     self.errorModal(t("update_check_failed"), info: message)
                 }
+            }
+        }
+    }
+
+    func installUpdate(version: String, downloadURL: URL) {
+        guard !updateInstallationInProgress else { return }
+        updateInstallationInProgress = true
+        refreshUpdateMenuItems()
+
+        UpdateInstaller.shared.prepareAndLaunch(version: version, downloadURL: downloadURL) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success:
+                clearPendingUpdate()
+                NSApp.terminate(nil)
+            case .failure(let error):
+                self.updateInstallationInProgress = false
+                self.refreshUpdateMenuItems()
+                self.errorModal(t("update_install_failed"), info: error.localizedDescription)
             }
         }
     }
@@ -2261,8 +2279,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
 
     func refreshUpdateMenuItems() {
         let hasPendingUpdate = pendingUpdate() != nil
-        updateMenuItem?.title = hasPendingUpdate ? t("updates_available") : t("updates")
-        checkForUpdatesMenuItem?.title = t("check_for_updates")
+        if updateInstallationInProgress {
+            updateMenuItem?.title = t("update_installing")
+            checkForUpdatesMenuItem?.title = t("update_installing")
+        } else {
+            updateMenuItem?.title = hasPendingUpdate ? t("updates_available") : t("updates")
+            checkForUpdatesMenuItem?.title = t("check_for_updates")
+        }
+        checkForUpdatesMenuItem?.isEnabled = !updateInstallationInProgress
         automaticUpdateChecksMenuItem?.state = automaticUpdateChecksEnabled() ? .on : .off
     }
 

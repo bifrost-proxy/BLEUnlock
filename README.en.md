@@ -81,6 +81,8 @@ Download the dmg file from [Releases](https://github.com/bifrost-proxy/BLEUnlock
 >
 > To reduce repeated permission prompts when updating, replace the existing `/Applications/BLEUnlock.app` instead of running copies from different folders.
 
+Use **Updates → Check for Updates…** in the app menu to query this repository's Latest Release. When a newer version is available, choose **Install Update**; the app verifies the DMG SHA-256, code signature, bundle ID, and version before replacing the current installation and relaunching.
+
 ## Setting up
 
 On the first launch, it asks for the following permissions, which you must grant:

@@ -89,6 +89,7 @@ curl -fsSL https://raw.githubusercontent.com/bifrost-proxy/BLEUnlock/master/inst
 - Homebrew 安装的版本与 GitHub Latest Release 一致；
 - 旧版升级时，设置、钥匙串密码和 event 脚本按预期迁移；
 - 用户知道新 Bundle ID 会触发蓝牙、辅助功能、通知等权限重新授权。
+- 从已安装旧版本执行“更新”→“检查更新…”，能够检测到更高版本，点击“安装更新”后自动替换 App、重启并显示新版本号。
 
 绑定至少一台设备并启用后台运行后，再执行 60 秒性能门禁：
 

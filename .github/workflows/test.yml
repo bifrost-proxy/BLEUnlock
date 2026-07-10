@@ -25,6 +25,7 @@ jobs:
         bash -n scripts/profile-background.sh
         bash -n scripts/sign-macos-app.sh
         bash -n scripts/verify-macos-dmg.sh
+        bash -n scripts/test-update-installer.sh
     - name: Start xcodebuild test
       run: |
         xcodebuild clean build \

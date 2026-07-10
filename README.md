@@ -81,6 +81,8 @@ curl -fsSL https://raw.githubusercontent.com/bifrost-proxy/BLEUnlock/master/inst
 >
 > 为了尽量减少更新后的重复授权，请始终覆盖 `/Applications/BLEUnlock.app`，不要从不同目录运行多个副本。
 
+应用菜单中的“更新”→“检查更新…”会读取本仓库的 Latest Release。发现更高版本后，可直接选择“安装更新”；应用会校验 DMG 的 SHA-256、代码签名、Bundle ID 和版本，替换当前安装并自动重启。
+
 ## 初次设置
 
 首次启动时，应用会请求以下权限，请全部按提示授权：
