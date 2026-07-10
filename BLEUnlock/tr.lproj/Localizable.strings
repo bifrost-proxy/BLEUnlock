@@ -10,6 +10,9 @@
 "enter_rssi_threshold_info" = "Eğer aygıt RSSI değeri bu değerin altında ise arama sırasında yok sayılacaktır.";
 "farther" = "⬇Uzak";
 "launch_at_login" = "Başlangıçta çalıştır";
+"run_in_background" = "Arka planda çalıştır (menü çubuğu simgesini gizle)";
+"run_in_background_info" = "BLEUnlock menü çubuğu simgesi olmadan çalışmaya devam eder. Simgeyi geri getirmek için Uygulamalar'dan BLEUnlock'ı yeniden açın.";
+"hide_menu_bar_icon" = "Simgeyi gizle";
 "lock_delay" = "Kilitleme gecikmesi";
 "lock_now" = "Ekranı şimdi kilitle";
 "lock_rssi" = "Kilitleme RSSI değeri";

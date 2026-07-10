@@ -21,6 +21,7 @@ private let lockRSSIMenuItemKind = "lockRSSI"
 private let pauseNowPlayingNoticeShownKey = "pauseNowPlayingNoticeShown"
 private let autoCheckUpdatesKey = "autoCheckUpdates"
 private let legacyBundleIDMigrationKey = "legacyBundleIDMigrationComplete"
+private let runInBackgroundKey = "runInBackground"
 
 private enum AppNotificationKind: String {
     case lock
@@ -159,6 +160,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     var updateMenuItem: NSMenuItem?
     var checkForUpdatesMenuItem: NSMenuItem?
     var automaticUpdateChecksMenuItem: NSMenuItem?
+    var runInBackgroundMenuItem: NSMenuItem?
     var deviceDict: [UUID: NSMenuItem] = [:]
     var deviceInsertionOrder: [UUID] = []
     var deviceCheckboxDict: [UUID: NSButton] = [:]
@@ -2065,6 +2067,30 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         }
     }
 
+    @objc func toggleRunInBackground(_ menuItem: NSMenuItem) {
+        let shouldRunInBackground = !prefs.bool(forKey: runInBackgroundKey)
+        if shouldRunInBackground {
+            let alert = NSAlert()
+            alert.messageText = t("run_in_background")
+            alert.informativeText = t("run_in_background_info")
+            alert.window.title = "BLEUnlock"
+            alert.addButton(withTitle: t("hide_menu_bar_icon"))
+            alert.addButton(withTitle: t("cancel"))
+            NSApp.activate(ignoringOtherApps: true)
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+
+        prefs.set(shouldRunInBackground, forKey: runInBackgroundKey)
+        menuItem.state = shouldRunInBackground ? .on : .off
+        if shouldRunInBackground {
+            DispatchQueue.main.async { [weak self] in
+                self?.statusItem.isVisible = false
+            }
+        } else {
+            statusItem.isVisible = true
+        }
+    }
+
     @objc func togglePauseNowPlaying(_ menuItem: NSMenuItem) {
         let pauseNowPlaying = !prefs.bool(forKey: "pauseItunes")
         prefs.set(pauseNowPlaying, forKey: "pauseItunes")
@@ -2365,6 +2391,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
             let enabled = self.isLaunchAtLoginEnabled()
             DispatchQueue.main.async { item?.state = enabled ? .on : .off }
         }
+
+        item = mainMenu.addItem(withTitle: t("run_in_background"), action: #selector(toggleRunInBackground), keyEquivalent: "")
+        runInBackgroundMenuItem = item
+        item.state = prefs.bool(forKey: runInBackgroundKey) ? .on : .off
         
         mainMenu.addItem(withTitle: t("set_rssi_threshold"), action: #selector(setRSSIThreshold),
                          keyEquivalent: "")
@@ -2516,6 +2546,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
             button.image = NSImage(named: "StatusBarDisconnected")
             constructMenu()
         }
+        statusItem.isVisible = !prefs.bool(forKey: runInBackgroundKey)
         ble.delegate = self
         let monitoredUUIDs = loadMonitoredUUIDs()
         // Resolve MAC addresses for monitored devices at startup so cross-correlation works
@@ -2605,6 +2636,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
 
     func applicationDidBecomeActive(_ notification: Notification) {
         refreshPermissionRecovery()
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if prefs.bool(forKey: runInBackgroundKey) || !statusItem.isVisible {
+            prefs.set(false, forKey: runInBackgroundKey)
+            runInBackgroundMenuItem?.state = .off
+            statusItem.isVisible = true
+        }
+        return false
     }
     
     func applicationWillTerminate(_ aNotification: Notification) {

@@ -13,6 +13,9 @@
 "enter_rssi_threshold_info" = "扫描设备时会忽略 RSSI 值低于该值的设备。";
 "farther" = "⬇远离";
 "launch_at_login" = "开机启动";
+"run_in_background" = "后台运行（隐藏菜单栏图标）";
+"run_in_background_info" = "BLEUnlock 将继续在后台运行，但不显示菜单栏图标。如需恢复图标，请从“应用程序”中再次打开 BLEUnlock。";
+"hide_menu_bar_icon" = "隐藏图标";
 "lock_delay" = "延迟锁定";
 "lock_now" = "立刻锁定屏幕";
 "lock_rssi" = "锁定 RSSI";
