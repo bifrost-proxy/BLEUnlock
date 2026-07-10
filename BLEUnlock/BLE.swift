@@ -449,7 +449,7 @@ class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     var signalTimeout = 60.0
     var powerWarn = true
     var passiveMode = false
-    var thresholdRSSI = -70
+    var thresholdRSSI = -60
     var lastAuthorizationRefreshAt = 0.0
     let minimumAuthorizationRefreshInterval = 2.0
     var monitoringSuspended = false

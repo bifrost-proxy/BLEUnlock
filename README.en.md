@@ -118,7 +118,7 @@ Set Password... | If you changed your login password, use this.
 Passive Mode | By default it actively tries to connect to the BLE device and read the RSSI. Most of the time, the default is recommended and works stably. However, if you are using other Bluetooth things like keyboard, mouse, track pad or most notably Bluetooth Personal Hotspot, the default mode may interfere with each other. 2.4GHz WiFi may interfere as well. If you are experiencing instability of Bluetooth, turn on Passive Mode.
 Launch at Login | Launches BLEUnlock when you login.
 Run in Background (Hide Menu Bar Icon) | Hides the menu bar icon while BLEUnlock keeps scanning and performing automatic lock/unlock actions. To restore the icon, open BLEUnlock again from Applications; this also turns off background hiding.
-Set Minimum RSSI | Devices with RSSI below this value will not be displayed in the device scan list.
+Set Minimum RSSI | Devices with RSSI below this value will not be displayed in the device scan list. The default is `-60 dBm`.
 
 ### Background Performance
 

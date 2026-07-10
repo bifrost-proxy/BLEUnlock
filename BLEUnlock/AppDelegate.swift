@@ -2311,7 +2311,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
     
     func constructMenu() {
         guard !menuConstructed else { return }
-        menuConstructed = true
         monitorMenuItem = mainMenu.addItem(withTitle: t("device_not_set"), action: nil, keyEquivalent: "")
         
         var item: NSMenuItem
@@ -2442,6 +2441,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         mainMenu.addItem(withTitle: t("about"), action: #selector(showAboutBox), keyEquivalent: "")
         mainMenu.addItem(NSMenuItem.separator())
         mainMenu.addItem(withTitle: t("quit"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
+        menuConstructed = true
         statusItem.menu = mainMenu
     }
 
@@ -2574,6 +2574,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
 
         if let button = statusItem.button {
             button.image = NSImage(named: "StatusBarDisconnected")
+            // Attach a menu object immediately, even during a hidden launch.
+            // AppKit then keeps the status item wired for clicks; the heavier
+            // menu item tree can still be built only when it becomes visible.
+            statusItem.menu = mainMenu
             if !prefs.bool(forKey: runInBackgroundKey) {
                 constructMenu()
             }
