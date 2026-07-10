@@ -61,6 +61,7 @@ git push origin v1.15.0
    - 在配置 Developer ID 与公证凭据时提交公证、staple 并执行 Gatekeeper 验收；
    - 生成 `BLEUnlock-vX.Y.Z.dmg` 和 `.sha256`；
    - 创建或更新 `bifrost-proxy/BLEUnlock` GitHub Release；
+   - 使用公开安装脚本下载刚发布的版本，在临时目录完成安装、版本、Bundle ID 与签名复验；
    - 更新 `bifrost-proxy/homebrew-tap` 的 `Casks/unlock.rb`。
 
 `workflow_dispatch` 只用于重跑一个已经存在的 tag，不用于从任意分支临时发版。

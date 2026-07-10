@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Make Release install the newly published asset through the public script and verify its version, bundle ID, and code signature before updating Homebrew.
+
 ## 1.15.1
 
 - Validate the complete two-version release, Homebrew installation, update detection, verified replacement, and relaunch path.
