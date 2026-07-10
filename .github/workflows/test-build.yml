@@ -34,7 +34,7 @@ jobs:
           security list-keychains -d user -s "${KEYCHAIN_PATH}"
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: refs/heads/master
 

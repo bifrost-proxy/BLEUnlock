@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Checkout release tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: refs/tags/${{ env.RELEASE_TAG }}
           fetch-depth: 0

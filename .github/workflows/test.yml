@@ -16,7 +16,7 @@ jobs:
     runs-on: macOS-latest
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Validate installer
       run: |
         bash -n install.sh
