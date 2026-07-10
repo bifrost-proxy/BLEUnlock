@@ -22,6 +22,7 @@ This document is also available in [Simplified Chinese (简体中文)](README.md
 - Optionally pauses and unpauses music/video playback when you're away and back
 - Password is securely stored in Keychain
 - Devices are ordered by ascending absolute RSSI, so the strongest signals appear first
+- Device-list scanning reads advertisements only and never connects to unbound peripherals
 - Devices with resolved MAC addresses appear in black; unresolved devices appear in gray, for at-a-glance distinction.
 - Hold ⌥ (Option) in the device list to reveal full MAC address and UUID. Release and reopen for compact display.
 

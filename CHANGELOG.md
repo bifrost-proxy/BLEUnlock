@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keep device-list discovery advertisement-only: never connect to unbound peripherals or probe their GATT services, preventing unrelated system connection prompts from nearby glasses, headphones, and other devices.
 - Optimize steady-state background monitoring by separating device-list discovery from bound-device tracking, pausing full scans while active connections are healthy, and disabling high-frequency name diagnostics by default.
 - Add a repeatable background performance gate requiring average CPU below 10% and maximum resident memory below 80 MB.
 - Sort monitored and unmonitored device groups by ascending absolute RSSI, placing the strongest signals first and devices without a signal last.

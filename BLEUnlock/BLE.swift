@@ -938,7 +938,7 @@ class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
                 // Build minimal device to resolve its name from all available sources
                 let probe = Device(uuid: peripheral.identifier)
                 probe.peripheral = peripheral
-                probe.manufacture = nil  // will be populated on connect
+                probe.manufacture = nil
                 probe.model = nil
                 // Resolve MAC from advertisement local name, peripheral name, or IOBluetooth
                 var resolvedMAC: String?
@@ -1000,7 +1000,6 @@ class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
                             }
                         }
                         
-                        central.connect(peripheral, options: nil)
                         device.logNameResolutionIfNeeded(context: "discover:merged")
                     }
                 }
@@ -1019,8 +1018,6 @@ class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
                     }
                     
                     devices[peripheral.identifier] = device
-                    central.connect(peripheral, options: nil)
-                    
                     // Post-hoc MAC correlation: check again now that device.macAddr is set
                     if let mac = device.macAddr, let matched = findKnownDeviceByMAC(newMAC: mac, knownDevices: devices.filter { $0.key != peripheral.identifier }) {
                         // Defer if old UUID still visible and monitored (same logic as discover:merged)
@@ -1092,9 +1089,6 @@ class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
                         didConnect peripheral: CBPeripheral)
     {
         peripheral.delegate = self
-        if deviceDiscoveryEnabled {
-            peripheral.discoverServices([DeviceInformation])
-        }
         if monitoringSuspended {
             cancelConnectionIfNeeded(peripheral)
             return
@@ -1217,11 +1211,6 @@ class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         }
     }
     
-    func peripheral(_ peripheral: CBPeripheral,
-                    didModifyServices invalidatedServices: [CBService])
-    {
-        peripheral.discoverServices([DeviceInformation])
-    }
     //MARK:CBPeripheralDelegate end -
 
     override init() {
