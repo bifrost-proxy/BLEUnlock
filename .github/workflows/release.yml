@@ -285,7 +285,7 @@ jobs:
 
             url "https://github.com/bifrost-proxy/BLEUnlock/releases/download/v#{version}/BLEUnlock-v#{version}.dmg"
             name "BLEUnlock"
-            desc "Lock and unlock a Mac by proximity of a Bluetooth Low Energy device"
+            desc "Lock and unlock a computer by proximity of a Bluetooth Low Energy device"
             homepage "https://github.com/bifrost-proxy/BLEUnlock"
 
             app "BLEUnlock.app"
@@ -299,6 +299,8 @@ jobs:
             ]
           end
           CASK
+
+          ruby -c "${CASK_PATH}"
 
           cd "${TAP_DIR}"
           git config user.name "github-actions[bot]"
